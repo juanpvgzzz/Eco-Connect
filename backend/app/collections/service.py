@@ -54,6 +54,7 @@ class Actor:
     id: UUID
     rol: str
     flujo: Flow | None = None
+    generador: Literal["hogar", "unidad_productiva"] | None = None
 
 
 class Record(BaseModel):
@@ -131,6 +132,8 @@ class Collections:
         key = key.strip()
         if not 1 <= len(key) <= 128:
             raise Problem(422, "Clave de reintento inválida")
+        if actor.generador is not None:
+            request = request.model_copy(update={"generador": actor.generador})
         flow = "huerta" if request.residuo == "organico" else "reciclaje"
         with self.transaction() as tx:
             self.require_pilot(tx, actor.id)
@@ -188,8 +191,8 @@ class Collections:
     def finish(tx, row, actor, delivery, kind):
         row.estado, row.entrega, row.cerrada_por = "recolectada", delivery, actor.id
         tx.save(row)
-        tx.event(row, kind, actor.id, None)
         tx.credit(row.id, row.cliente, delivery.material, delivery.kilos)
+        tx.event(row, kind, actor.id, None)
         return row
 
     def close(self, actor: Actor, id: UUID, delivery: Delivery):

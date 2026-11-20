@@ -38,3 +38,21 @@ insert into request_audit (request_id, pilot_id, actor_id, from_status, to_statu
     ('60000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001',
      '20000000-0000-4000-8000-000000000002',
      'recibida', 'programada');
+
+-- Pilot catalog and a fictional shift for local functional smoke tests.
+insert into collectives (pilot_id, flow)
+select id, flow from pilots cross join (values ('huerta'), ('reciclaje')) as flows(flow)
+where id = '10000000-0000-4000-8000-000000000001';
+
+insert into collection_shifts (collective_id, pilot_id, worker_id, starts_at, ends_at)
+select id, pilot_id, '30000000-0000-4000-8000-000000000001',
+       now() - interval '1 day', now() + interval '30 days'
+from collectives where pilot_id = '10000000-0000-4000-8000-000000000001';
+
+update users set collective_id = (
+    select id from collectives
+    where pilot_id = '10000000-0000-4000-8000-000000000001' and flow = 'reciclaje'
+) where id = '20000000-0000-4000-8000-000000000002';
+
+update pickup_requests set flow = 'reciclaje'
+where id = '60000000-0000-4000-8000-000000000001';

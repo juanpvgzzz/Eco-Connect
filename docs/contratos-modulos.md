@@ -1,6 +1,6 @@
 # Contratos de integración
 
-Este documento fija las interfaces que consume HTTP. Los adaptadores PostgreSQL y los módulos dueños deben implementar las firmas de `backend/app/**/ports.py`; las pruebas actuales usan dobles explícitos. Confirmar estos contratos al integrar las ramas de Codex 2 y Codex 3.
+Este documento fija las interfaces que consume HTTP. Los adaptadores PostgreSQL implementan las firmas de `backend/app/**/ports.py`. Las pruebas unitarias usan dobles explícitos y las pruebas de integración usan PostgreSQL 16.
 
 ## Cuentas y sesiones — persistencia compartida (Codex 3)
 
@@ -19,7 +19,7 @@ Este documento fija las interfaces que consume HTTP. Los adaptadores PostgreSQL 
 
 `CommunityCollectionsGateway.create_for_user(actor, request, idempotency_key)` recibe la identidad autenticada, el comando validado y la cabecera `Idempotency-Key` obligatoria. Debe conservar la clave hasta `Collections.create(actor, key, request)` de Codex 2; el cliente reutiliza la misma clave en reintentos del mismo envío y crea una nueva para otro envío. La clave se recorta y limita a 128 caracteres en la capa HTTP. El módulo Codex 2 reserva por propietario y clave y devuelve el mismo registro si la solicitud coincide; reutilizarla con otros datos produce conflicto.
 
-### Traducción pendiente entre Cuentas y Codex 02
+### Traducción entre Cuentas y Codex 02
 
 La ruta de cuentas expone `POST /community/collections` con `flow`, `description`, `contact`, `address` y una ventana `preferred_from`/`preferred_until`. Codex 02 expone `POST /recolecciones` con `residuo`, `material`, `contacto`, `direccion`, `generador`, `disponibilidad` y `observaciones`. El adaptador debe traducir explícitamente:
 
@@ -31,7 +31,9 @@ La ruta de cuentas expone `POST /community/collections` con `flow`, `description
 | `household` / `business` | `hogar` / `unidad_productiva` | `generador`; pilotaje empresarial sigue siendo autorización del adaptador |
 | `Idempotency-Key` | argumento `key` de `Collections.create` | conservar la misma clave del envío lógico |
 
-`description` no equivale necesariamente a `material` más `observaciones`, y la ventana con dos fechas no cabe sin pérdida en el texto `disponibilidad`; el adaptador debe acordar esos dos mapeos antes de conectarse. Codex 02 espera roles `cliente`/`lider` y UUIDs, mientras Cuentas usa roles `resident`/`business`/`leader` y guarda IDs como texto; el adaptador valida y convierte esas identidades. `AccountIdentity.collective_id` no tiene campo equivalente en `Actor`: Codex 02 usa `Actor.flujo` (`huerta`/`reciclaje`) como ámbito de liderazgo, no como ID de colectivo. Además, su `Transaction.pilot(client)` no recibe el `pilot_id` de Cuentas. No inferir colectivo ni piloto desde el flujo o `pilot_enabled`; falta definir el puente de IDs y alcance en el adaptador real.
+La descripción se conserva completa en `observaciones`. La ventana se representa como dos instantes ISO 8601 en UTC separados por `/` en `disponibilidad`. El formulario comunitario indica el flujo, por lo que el adaptador usa `Orgánico` o `Reciclable` en el campo descriptivo `material`; el catálogo determina el material y la tarifa al cerrar la entrega. La clave y el propietario delimitan el reintento.
+
+`ECO_PILOT_ID` identifica el piloto de la instancia. La cuenta de cada líder referencia un colectivo de ese piloto. El catálogo asigna un colectivo por flujo y piloto. El adaptador controla el acceso de las unidades productivas con `pilot_enabled`. En solicitudes antiguas, asigna el flujo después de revisar los datos operativos para habilitar la bandeja de la líder.
 
 Para lectura, `list_for_user(owner_id)`, `get_for_user(owner_id, request_id)`, `list_notifications_for_user(owner_id)` y `list_appointments_for_user(owner_id)` deben filtrar en origen por el propietario solicitado. Una empresa no habilitada lanza `BusinessNotEnabled` y HTTP responde 403. Estados consumidos: `received`, `under_review`, `scheduled`, `collected`, `cancelled`. Las citas deben incluir fecha con zona horaria y responsable; solo entonces el estado puede ser `scheduled`. HTTP las convierte a `America/Bogota`.
 
@@ -43,8 +45,10 @@ Un registro con estado `scheduled` requiere fecha/hora con zona y persona encarg
 
 `CommunityPointsGateway` ofrece `get_points_for_user(owner_id)`, `list_movements_for_user(owner_id)`, `list_rewards()` y `request_code_for_user(owner_id, reward_id)`. Las lecturas privadas filtran por dueño. La solicitud devuelve un código sin debitar puntos; la confirmación del canje sigue en la API de Codex 2. Saldo insuficiente se traduce a `InsufficientPoints`.
 
-Los adaptadores reales de Codex 02 y Codex 03 aún no están montados en esta rama. Si falta el gateway necesario, las rutas responden 503; mientras tanto, las pruebas usan dobles explícitos. La integración sigue pendiente de la traducción de solicitud/identidad anterior, del puente piloto-colectivo y de conectar consultas de citas/avisos y puntos al almacenamiento compartido.
+El código dura 24 horas. La confirmación revalida el saldo y las existencias, y aplica el débito y la reducción de stock en una transacción. La repetición de un código confirmado devuelve el mismo comprobante.
 
-## Inyección en la app
+## Composición
 
-El adaptador compartido crea la app con `create_app(account_store=..., content_store=..., collections_gateway=..., points_gateway=...)`. Las rutas de recolección requieren solo `collections_gateway`; las rutas de puntos solo `points_gateway`. Si falta el adaptador requerido por una ruta, esta responde `503`; no se usa persistencia en memoria en producción.
+`backend.app.main:app` carga los adaptadores PostgreSQL y las rutas de `/recolecciones` cuando se configuran `DATABASE_URL` y `ECO_PILOT_ID`. Para pruebas unitarias, `create_app` acepta los adaptadores por parámetro. Sin adaptador para una ruta de cuentas, contenidos o comunidad, esa ruta responde `503`.
+
+Las transiciones de recolección, los avisos, el cierre y el abono usan una sola transacción. La migración `002_api_integration.sql` conserva el historial de la migración inicial y agrega los catálogos y columnas de integración.

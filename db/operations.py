@@ -174,35 +174,42 @@ def confirm_redemption(database_url: str, client_id: str | UUID,
         raise DomainError("code is required and must be at most 100 characters")
     with open_connection(database_url) as conn:
         with conn.transaction():
-            client = conn.execute("""
-                select pilot_id, points_balance, role, active from users
-                where id = %s for update
-            """, (client_id,)).fetchone()
-            if not client or client["role"] != "cliente" or not client["active"]:
-                raise DomainError("active client required")
-            existing = conn.execute("""
-                select id, client_id, reward_id, points_cost from redemptions where code = %s
-            """, (code,)).fetchone()
-            if existing:
-                if existing["client_id"] != client_id or existing["reward_id"] != reward_id:
-                    raise DomainError("code already used")
-                return existing["id"], existing["points_cost"]
-            reward = conn.execute("""
-                select points_cost, stock, active from rewards
-                where id = %s and pilot_id = %s for update
-            """, (reward_id, client["pilot_id"])).fetchone()
-            if not reward or not reward["active"] or reward["stock"] < 1:
-                raise DomainError("reward unavailable")
-            if client["points_balance"] < reward["points_cost"]:
-                raise DomainError("insufficient points")
-            redemption_id = conn.execute("""
-                insert into redemptions
-                    (client_id, pilot_id, reward_id, code, points_cost)
-                values (%s, %s, %s, %s, %s) returning id
-            """, (client_id, client["pilot_id"], reward_id, code,
-                  reward["points_cost"])).fetchone()["id"]
-            conn.execute("""
-                insert into point_movements (client_id, redemption_id, amount)
-                values (%s, %s, %s)
-            """, (client_id, redemption_id, -reward["points_cost"]))
-            return redemption_id, reward["points_cost"]
+            return confirm_redemption_in_transaction(conn, client_id, reward_id, code)
+
+
+def confirm_redemption_in_transaction(
+    conn, client_id: UUID, reward_id: UUID, code: str,
+) -> tuple[UUID, int]:
+    """Confirm a redemption inside the caller's transaction."""
+    client = conn.execute("""
+        select pilot_id, points_balance, role, active from users
+        where id = %s for update
+    """, (client_id,)).fetchone()
+    if not client or client["role"] != "cliente" or not client["active"]:
+        raise DomainError("active client required")
+    existing = conn.execute("""
+        select id, client_id, reward_id, points_cost from redemptions where code = %s
+    """, (code,)).fetchone()
+    if existing:
+        if existing["client_id"] != client_id or existing["reward_id"] != reward_id:
+            raise DomainError("code already used")
+        return existing["id"], existing["points_cost"]
+    reward = conn.execute("""
+        select points_cost, stock, active from rewards
+        where id = %s and pilot_id = %s for update
+    """, (reward_id, client["pilot_id"])).fetchone()
+    if not reward or not reward["active"] or reward["stock"] < 1:
+        raise DomainError("reward unavailable")
+    if client["points_balance"] < reward["points_cost"]:
+        raise DomainError("insufficient points")
+    redemption_id = conn.execute("""
+        insert into redemptions
+            (client_id, pilot_id, reward_id, code, points_cost)
+        values (%s, %s, %s, %s, %s) returning id
+    """, (client_id, client["pilot_id"], reward_id, code,
+          reward["points_cost"])).fetchone()["id"]
+    conn.execute("""
+        insert into point_movements (client_id, redemption_id, amount)
+        values (%s, %s, %s)
+    """, (client_id, redemption_id, -reward["points_cost"]))
+    return redemption_id, reward["points_cost"]

@@ -1,8 +1,11 @@
 """Integration tests: set TEST_DATABASE_URL to a disposable PostgreSQL database."""
 
 import os
+from pathlib import Path
+import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import patch
 from uuid import uuid4
 
 
@@ -79,12 +82,52 @@ class PersistenceTests(unittest.TestCase):
 
     def test_migrations_clean_and_repeatable(self):
         from db.migrate import migrate
-        self.assertEqual(self.applied, ["001_initial.sql"])
+        self.assertEqual(self.applied, ["001_initial.sql", "002_api_integration.sql"])
         self.assertEqual(self.applied_again, [])
         self.assertEqual(migrate(self.url), [])
         with self.psycopg.connect(self.url) as conn:
             self.assertEqual(conn.execute("select count(*) from users where id=%s",
                                           (self.client,)).fetchone()[0], 1)
+
+    def test_api_migration_preserves_existing_pilot_data(self):
+        from psycopg import sql
+        from psycopg.conninfo import make_conninfo
+
+        from db.migrate import MIGRATIONS, migrate
+
+        base = os.environ["TEST_DATABASE_URL"]
+        namespace = f"ec_upgrade_{uuid4().hex}"
+        schema = sql.Identifier(namespace)
+        with self.psycopg.connect(base, autocommit=True) as conn:
+            conn.execute(sql.SQL("create schema {}").format(schema))
+        self.addCleanup(self._drop_schema, base, schema)
+        url = make_conninfo(base, options=f"-c search_path={namespace}")
+        with tempfile.TemporaryDirectory() as temp:
+            first = "001_initial.sql"
+            (Path(temp) / first).write_bytes((MIGRATIONS / first).read_bytes())
+            with patch("db.migrate.MIGRATIONS", Path(temp)):
+                self.assertEqual(migrate(url), [first])
+
+        demo = (MIGRATIONS.parent / "demo.sql").read_text()
+        initial_demo = demo.split("-- Pilot catalog and a fictional shift")[0]
+        with self.psycopg.connect(url, autocommit=True) as conn:
+            conn.execute(initial_demo)
+        self.assertEqual(migrate(url), ["002_api_integration.sql"])
+        self.assertEqual(migrate(url), [])
+        with self.psycopg.connect(url) as conn:
+            row = conn.execute("""
+                select p.status, n.message, s.starts_at is not null
+                from pickup_requests p join pickup_notices n on n.request_id = p.id
+                join pickup_appointments a on a.request_id = p.id
+                join pickup_slots s on s.id = a.slot_id
+            """).fetchone()
+            self.assertEqual(row, ("programada", "Cita de prueba creada.", True))
+
+    def _drop_schema(self, base, schema):
+        from psycopg import sql
+
+        with self.psycopg.connect(base, autocommit=True) as conn:
+            conn.execute(sql.SQL("drop schema {} cascade").format(schema))
 
     def test_constraints_reject_duplicate_document_cross_pilot_and_bad_weight(self):
         with self.psycopg.connect(self.url, autocommit=True) as conn:
