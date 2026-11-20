@@ -12,12 +12,21 @@ from backend.app.accounts.service import (
     InvalidSession,
     TooManyLoginAttempts,
 )
+from backend.app.content.ports import ContentStore
+from backend.app.content.router import router as content_router
+from backend.app.content.service import ContentError, ContentNotFound, ForbiddenContentAction
 
 
-def create_app(*, account_store: AccountStore | None = None) -> FastAPI:
+def create_app(
+    *,
+    account_store: AccountStore | None = None,
+    content_store: ContentStore | None = None,
+) -> FastAPI:
     app = FastAPI(title="EcoConecta API", version="0.1.0")
     app.state.account_store = account_store
+    app.state.content_store = content_store
     app.include_router(accounts_router)
+    app.include_router(content_router)
 
     @app.exception_handler(AccountError)
     async def account_error_handler(request: Request, exc: AccountError) -> JSONResponse:
@@ -41,6 +50,16 @@ def create_app(*, account_store: AccountStore | None = None) -> FastAPI:
     @app.exception_handler(ValueError)
     async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+    @app.exception_handler(ContentError)
+    async def content_error_handler(request: Request, exc: ContentError) -> JSONResponse:
+        if isinstance(exc, ForbiddenContentAction):
+            status_code, detail = 403, "Insufficient permissions"
+        elif isinstance(exc, ContentNotFound):
+            status_code, detail = 404, "Content not found"
+        else:
+            status_code, detail = 400, "Content request could not be completed"
+        return JSONResponse(status_code=status_code, content={"detail": detail})
 
     return app
 
