@@ -82,6 +82,8 @@ function Field({ label, children }) {
 }
 
 function Login({ onLogin }) {
+  const [registering, setRegistering] = useState(false);
+  const [success, setSuccess] = useState("");
   const [id, setId] = useState(""),
     [pin, setPin] = useState(""),
     [busy, setBusy] = useState(false),
@@ -109,67 +111,209 @@ function Login({ onLogin }) {
         </section>
         <section className="loginPanel">
           <div className="loginInner">
-            <h1>Iniciar sesión</h1>
-            <p className="muted">Ingresa con tu cédula y PIN.</p>
-            <form onSubmit={submit}>
-              <Field label="Cédula">
-                <input
-                  autoComplete="username"
-                  inputMode="numeric"
-                  required
-                  value={id}
-                  onChange={(e) => setId(e.target.value)}
-                />
-              </Field>
-              <Field label="PIN">
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  inputMode="numeric"
-                  required
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                />
-              </Field>
-              {error && (
-                <p role="alert">
-                  <CircleAlert size={18} aria-hidden="true" />
-                  {error}
-                </p>
-              )}
-              <button className="primary w-full" disabled={busy}>
-                Entrar <ArrowRight size={18} />
-              </button>
-            </form>
-            {isDemo && (
-              <section className="demo">
-                <h3>Perfiles de demostración</h3>
-                <div className="profileChoices">
-                  {demoProfiles.map((p, i) => {
-                    const Icon = [CircleUserRound, Sprout, Recycle][i];
-                    return (
-                      <button
-                        type="button"
-                        className="chip"
-                        aria-pressed={id === p.national_id && pin === p.pin}
-                        key={p.label}
-                        onClick={() => {
-                          setId(p.national_id);
-                          setPin(p.pin);
-                        }}
-                      >
-                        <Icon size={16} />
-                        {p.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
+            {registering ? (
+              <Registration
+                onBack={() => setRegistering(false)}
+                onCreated={(nationalId) => {
+                  setId(nationalId);
+                  setPin("");
+                  setSuccess(
+                    "Cuenta creada. Ingresa tu PIN para iniciar sesión.",
+                  );
+                  setRegistering(false);
+                }}
+              />
+            ) : (
+              <>
+                <h1>Iniciar sesión</h1>
+                <p className="muted">Ingresa con tu cédula y PIN.</p>
+                {success && <p role="status">{success}</p>}
+                <form onSubmit={submit}>
+                  <Field label="Cédula">
+                    <input
+                      autoComplete="username"
+                      inputMode="numeric"
+                      required
+                      value={id}
+                      onChange={(e) => setId(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="PIN">
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      inputMode="numeric"
+                      required
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value)}
+                    />
+                  </Field>
+                  {error && (
+                    <p role="alert">
+                      <CircleAlert size={18} aria-hidden="true" />
+                      {error}
+                    </p>
+                  )}
+                  <button className="primary w-full" disabled={busy}>
+                    Entrar <ArrowRight size={18} />
+                  </button>
+                </form>
+                <button
+                  className="secondary registerLink"
+                  disabled={busy}
+                  onClick={() => {
+                    setError("");
+                    setSuccess("");
+                    setRegistering(true);
+                  }}
+                >
+                  Registrarse
+                </button>
+                {isDemo && (
+                  <section className="demo">
+                    <h3>Perfiles de demostración</h3>
+                    <div className="profileChoices">
+                      {demoProfiles.map((p, i) => {
+                        const Icon = [CircleUserRound, Sprout, Recycle][i];
+                        return (
+                          <button
+                            type="button"
+                            className="chip"
+                            aria-pressed={id === p.national_id && pin === p.pin}
+                            key={p.label}
+                            onClick={() => {
+                              setId(p.national_id);
+                              setPin(p.pin);
+                            }}
+                          >
+                            <Icon size={16} />
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+              </>
             )}
           </div>
         </section>
       </div>
     </main>
+  );
+}
+
+function Registration({ onBack, onCreated }) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(e) {
+    e.preventDefault();
+    const data = formValues(e);
+    data.national_id = data.national_id.replace(/[.\s-]/g, "");
+    if (!/^[0-9]{1,20}$/.test(data.national_id)) {
+      setError("Revisa tu cédula. Debe tener entre 1 y 20 dígitos.");
+      return;
+    }
+    for (const field of ["full_name", "address", "phone"])
+      data[field] = data[field].trim();
+    if (!data.full_name || !data.address || !data.phone) {
+      setError("Completa el nombre, la dirección y el celular.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await request("/accounts", { body: data });
+      onCreated(data.national_id);
+    } catch (err) {
+      setError(
+        err.status === 409
+          ? "Esta cédula ya tiene una cuenta. Vuelve a iniciar sesión."
+          : err.message,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <h1>Crear cuenta</h1>
+      <p className="muted">
+        {isDemo
+          ? "Usa datos ficticios para probar el registro."
+          : "Completa tus datos para solicitar recogidas."}
+      </p>
+      <form onSubmit={submit}>
+        <fieldset disabled={busy} className="registrationGrid">
+          <Field label="Nombre completo">
+            <input
+              name="full_name"
+              autoComplete="name"
+              maxLength={160}
+              required
+            />
+          </Field>
+          <Field label="Cédula">
+            <input
+              name="national_id"
+              autoComplete="username"
+              inputMode="numeric"
+              maxLength={32}
+              required
+            />
+          </Field>
+          <Field label="Celular">
+            <input
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+              maxLength={32}
+              required
+            />
+          </Field>
+          <Field label="Dirección">
+            <input
+              name="address"
+              autoComplete="street-address"
+              maxLength={240}
+              required
+            />
+          </Field>
+          <Field label="Tipo de cuenta">
+            <select name="kind" required defaultValue="">
+              <option value="" disabled>
+                Selecciona una opción
+              </option>
+              <option value="household">Hogar</option>
+              <option value="business">Unidad productiva o negocio</option>
+            </select>
+          </Field>
+          <Field label="PIN (4 a 12 dígitos)">
+            <input
+              type="password"
+              name="pin"
+              inputMode="numeric"
+              autoComplete="new-password"
+              pattern="[0-9]{4,12}"
+              minLength={4}
+              maxLength={12}
+              required
+            />
+          </Field>
+        </fieldset>
+        {error && <p role="alert">{error}</p>}
+        <button className="primary w-full" disabled={busy}>
+          Crear cuenta
+        </button>
+      </form>
+      <button
+        className="secondary registerLink"
+        onClick={onBack}
+        disabled={busy}
+      >
+        Volver a iniciar sesión
+      </button>
+    </>
   );
 }
 

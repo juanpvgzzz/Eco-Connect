@@ -44,16 +44,80 @@ const titles = {
   recolectada: "Recogida completada",
 };
 
-function serve(path, { token, body, key }) {
+const registrationStore = "eco.demo.registrations.v1";
+async function pinVerifier(pin, salt) {
+  const bytes = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    bytes.encode(pin),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: bytes.encode(salt),
+      iterations: 150000,
+    },
+    key,
+    256,
+  );
+  return Array.from(new Uint8Array(bits), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function serve(path, { token, body, key }) {
+  const registrations = JSON.parse(
+    localStorage.getItem(registrationStore) || "[]",
+  );
+  const identities = [...accounts, ...registrations.map((r) => r.identity)];
+  if (path === "/accounts") {
+    if (identities.some((a) => a.profile.national_id === body.national_id))
+      throw Object.assign(Error("Esta cédula ya tiene una cuenta."), {
+        status: 409,
+      });
+    const { pin, national_id, full_name, address, phone, kind } = body;
+    const identity = {
+      id: crypto.randomUUID(),
+      collective_id: null,
+      profile: {
+        national_id,
+        full_name,
+        address,
+        phone,
+        kind,
+        role: kind === "business" ? "business" : "resident",
+        pilot_enabled: false,
+      },
+    };
+    const salt = crypto.randomUUID();
+    registrations.push({
+      identity,
+      salt,
+      verifier: await pinVerifier(pin, salt),
+    });
+    localStorage.setItem(registrationStore, JSON.stringify(registrations));
+    return identity;
+  }
   if (path === "/accounts/login") {
-    const account = accounts.find(
-      (a) => a.profile.national_id === body.national_id,
+    const account = identities.find(
+      (a) => a.profile.national_id === body.national_id.replace(/[.\s-]/g, ""),
     );
-    if (!account || body.pin !== "1234")
+    const registration = registrations.find(
+      (r) => r.identity.id === account?.id,
+    );
+    const valid = registration
+      ? (await pinVerifier(body.pin, registration.salt)) ===
+        registration.verifier
+      : body.pin === "1234";
+    if (!account || !valid)
       throw Error("Revisa la cédula y el PIN de demostración.");
     return { access_token: "demo-" + account.id, token_type: "bearer" };
   }
-  const user = accounts.find((a) => "demo-" + a.id === token);
+  const user = identities.find((a) => "demo-" + a.id === token);
   if (!user)
     throw Object.assign(Error("Vuelve a iniciar sesión."), { status: 401 });
   if (path === "/accounts/me") return user;
@@ -110,6 +174,10 @@ function serve(path, { token, body, key }) {
   if (path === "/recolecciones/avisos") return events;
   if (path === "/recolecciones" && !body && leader) return inbox;
   if (path === "/recolecciones" && body && !leader && key) {
+    if (!user.profile.pilot_enabled)
+      throw Error(
+        "Tu cuenta aún no está habilitada para recogidas del piloto.",
+      );
     const existing = own.find((r) => r.key === key);
     if (existing) {
       if (JSON.stringify(existing.solicitud) !== JSON.stringify(body))

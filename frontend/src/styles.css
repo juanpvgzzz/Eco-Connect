@@ -525,3 +525,60 @@ header button:focus-visible {
     padding-inline: 8px;
   }
 }
+/* La vista de acceso distribuye el espacio entre la marca, el formulario y el pie. */
+#root:has(.login) {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+.login {
+  flex: 1;
+  min-height: auto;
+}
+.registerLink {
+  width: 100%;
+  margin-top: 10px;
+}
+.registrationGrid {
+  min-width: 0;
+}
+@media (max-width: 1023px) and (orientation: portrait) {
+  .login {
+    display: grid;
+    padding: clamp(10px, 2vw, 20px);
+    place-items: stretch center;
+  }
+  .loginCard {
+    width: 100%;
+    max-width: 800px;
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(min-content, 0.32fr) minmax(min-content, 1fr);
+  }
+  .loginIdentity {
+    padding: 12px;
+    gap: 0;
+    border-bottom: 1px solid #e0e9dc;
+  }
+  .loginIdentity .brand img {
+    width: clamp(220px, 36vw, 310px);
+  }
+  .loginPanel {
+    padding: clamp(18px, 4vw, 40px);
+  }
+  .loginInner {
+    width: min(100%, 520px);
+  }
+}
+@media (min-width: 600px) and (max-width: 1023px) and (orientation: portrait) {
+  .registrationGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 16px;
+  }
+  .login .field input,
+  .login .field select,
+  .login .primary,
+  .registerLink {
+    min-height: 52px;
+  }
+}
