@@ -95,3 +95,13 @@ def test_only_admin_can_authorize_profiles_and_enable_pilot():
     assert updated.status_code == 200
     assert updated.json()["profile"]["role"] == "leader"
     assert updated.json()["profile"]["pilot_enabled"] is True
+
+
+def test_openapi_exposes_account_content_and_community_routes():
+    client, _ = make_client()
+
+    schema = client.get("/openapi.json").json()
+
+    assert "/accounts/login" in schema["paths"]
+    assert "/content" in schema["paths"]
+    assert "/community/collections" in schema["paths"]

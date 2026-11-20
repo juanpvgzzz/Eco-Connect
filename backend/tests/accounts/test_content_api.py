@@ -27,6 +27,9 @@ def test_only_published_content_is_public_and_admin_can_publish():
     assert draft_response.status_code == 201
     draft = draft_response.json()
     assert draft["status"] == "draft"
+    admin_drafts = client.get("/content/admin", headers=headers)
+    assert admin_drafts.status_code == 200
+    assert admin_drafts.json()[0]["id"] == draft["id"]
     assert client.get("/content").json() == []
     assert client.get(f"/content/{draft['id']}").status_code == 404
     assert client.post(f"/content/admin/{draft['id']}/publish", headers=headers).status_code == 200
