@@ -1,0 +1,1 @@
+"""EcoConecta backend package."""
