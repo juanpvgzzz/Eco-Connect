@@ -1,13 +1,14 @@
 from contextlib import contextmanager
 from copy import deepcopy
 from unittest import TestCase
+from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.app.collections.api import router
-from backend.app.collections.service import Actor, Collections
+from backend.app.collections.service import Actor, Collections, Notice
 
 
 class Memory:
@@ -17,6 +18,7 @@ class Memory:
         self.keys = {}
         self.rows = {}
         self.events = []
+        self.saved_notices = []
         self.credits = []
         self.worker = uuid4()
         self.reject_credit = False
@@ -47,12 +49,18 @@ class Memory:
 
     def event(self, row, kind, author, reason):
         self.events.append((deepcopy(row), kind, author, reason))
+        notice = Notice(solicitud_id=row.id, evento=kind, motivo=reason,
+                        cita=row.cita, responsable=row.responsable)
+        self.saved_notices.append((row.cliente, row.flujo, notice))
 
     def inbox(self, flow, state):
         return [r for r in self.rows.values() if r.flujo == flow and (not state or r.estado == state)]
 
     def notices(self, flow):
-        return [{"evento": kind} for row, kind, _, _ in self.events if row.flujo == flow]
+        return [notice for _, target, notice in self.saved_notices if target == flow]
+
+    def client_notices(self, client):
+        return [notice for target, _, notice in self.saved_notices if target == client]
 
     def history(self, flow, id):
         return [{"evento": kind, "motivo": why} for row, kind, _, why in self.events
@@ -76,7 +84,7 @@ class Operations(TestCase):
         self.db = Memory(self.client.id)
         app = FastAPI()
         app.include_router(router(Collections(self.db.transaction), lambda: self.actor))
-        self.api = TestClient(app, raise_server_exceptions=False)
+        self.api = self.enterContext(TestClient(app, raise_server_exceptions=False))
         self.base = "/recolecciones"
         self.body = dict(residuo="organico", material="cáscaras", contacto="ficticio",
                          direccion="piloto", generador="hogar", disponibilidad="mañana")
@@ -100,10 +108,30 @@ class Operations(TestCase):
         for leader, row in [(self.garden, a), (self.recycler, b)]:
             self.actor = leader
             self.assertEqual(self.api.get(self.base, params={"estado": "recibida"}).json(), [row])
-            self.assertEqual(self.api.get(self.base + "/avisos").json(), [{"evento": "recibida"}])
+            notices = self.api.get(self.base + "/avisos").json()
+            self.assertEqual([(n["evento"], n["solicitud_id"]) for n in notices], [("recibida", row["id"])])
         path = self.base + "/" + a["id"]
         self.assertEqual(self.api.get(path + "/historial").status_code, 404)
         self.assertEqual(self.api.post(path + "/cancelar", json={"motivo": "prueba"}).status_code, 404)
+
+    @patch("socket.socket.connect", side_effect=AssertionError("Conexión externa"))
+    def test_internal_notices_by_recipient(self, connect):
+        path = self.pending()
+        appointments = ["2026-11-21T08:00:00-05:00", "2026-11-22T10:00:00-05:00"]
+        for at in appointments:
+            response = self.api.post(path + "/programar", json={"cita": at, "motivo": "Disponibilidad"})
+            self.assertEqual(response.status_code, 200, response.text)
+        for actor in (self.client, self.garden):
+            self.actor = actor
+            notices = self.api.get(self.base + "/avisos").json()
+            self.assertEqual([n["evento"] for n in notices], ["recibida", "programada", "reprogramada"])
+            self.assertEqual([n["cita"] for n in notices[1:]], appointments)
+            self.assertEqual(notices[-1]["responsable"], str(self.db.worker))
+            self.assertEqual(notices[-1]["motivo"], "Disponibilidad")
+        for actor in (Actor(uuid4(), "cliente"), self.recycler):
+            self.actor = actor
+            self.assertEqual(self.api.get(self.base + "/avisos").json(), [])
+        connect.assert_not_called()
 
     def test_pilot(self):
         self.actor = Actor(uuid4(), "cliente")

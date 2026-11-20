@@ -8,7 +8,7 @@ from pydantic import Field
 
 from .service import (
     Actor, Collections, Delivery, Direct, Input, Key, Problem, Reason, Record,
-    Request, Schedule, State, Text, leader, local,
+    Notice, Request, Schedule, State, Text, leader, local,
 )
 
 
@@ -47,11 +47,12 @@ def router(service: Collections, authenticated_actor) -> APIRouter:
         with service.transaction() as tx:
             return tx.inbox(flow, estado)
 
-    @routes.get("/avisos")
+    @routes.get("/avisos", response_model=list[Notice])
     def notices(actor: Actor = auth):
-        flow = leader(actor)
         with service.transaction() as tx:
-            return tx.notices(flow)
+            if actor.rol == "cliente":
+                return tx.client_notices(actor.id)
+            return tx.notices(leader(actor))
 
     @routes.get("/resumen")
     def summary(desde: datetime, hasta: datetime, actor: Actor = auth):
