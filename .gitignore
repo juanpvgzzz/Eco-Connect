@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Node
+node_modules/
+dist/
+.next/
+
+# Local secrets and configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
