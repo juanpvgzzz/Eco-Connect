@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from backend.app.accounts.models import AccountIdentity
+from backend.app.errors import InvalidInput
 from backend.app.community.models import (
     CollectionStatus,
     CollectionRecord,
@@ -62,10 +65,17 @@ class CommunityService:
         self.points = points
 
     def request_collection(
-        self, *, actor: AccountIdentity, request: CreateCollectionCommand
+        self,
+        *,
+        actor: AccountIdentity,
+        request: CreateCollectionCommand,
+        idempotency_key: str,
     ) -> CollectionRecord:
+        idempotency_key = idempotency_key.strip()
+        if not idempotency_key or len(idempotency_key) > 128:
+            raise InvalidInput()
         try:
-            item = self._collections().create_for_user(actor, request)
+            item = self._collections().create_for_user(actor, request, idempotency_key)
         except BusinessNotEnabled:
             raise CommunityNotEligible from None
         return self._owned(item, actor.id)

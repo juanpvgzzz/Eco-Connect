@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
 from backend.app.accounts.dependencies import get_current_identity
 from backend.app.accounts.models import AccountIdentity
@@ -59,10 +59,15 @@ def get_points_service(request: Request) -> CommunityService:
 )
 def request_collection(
     request: CollectionRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
     actor: AccountIdentity = Depends(get_current_identity),
     service: CommunityService = Depends(get_collections_service),
 ) -> CollectionResponse:
-    return service.request_collection(actor=actor, request=request.to_command())
+    return service.request_collection(
+        actor=actor,
+        request=request.to_command(),
+        idempotency_key=idempotency_key,
+    )
 
 
 @router.get("/collections", response_model=list[CollectionResponse])

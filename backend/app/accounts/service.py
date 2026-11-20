@@ -6,6 +6,7 @@ import secrets
 from uuid import uuid4
 
 from pwdlib import PasswordHash
+from pwdlib.exceptions import UnknownHashError
 
 from backend.app.errors import InvalidInput
 from backend.app.accounts.models import (
@@ -108,17 +109,8 @@ class AccountService:
             raise TooManyLoginAttempts
 
         account = self.store.find_by_national_id(normalized_id)
-        if account is None:
-            self.password_hash.verify(pin, self._dummy_hash)
-            self.store.record_login_failure(
-                attempt_key,
-                now,
-                self.max_attempts,
-                self.failure_window,
-                self.lockout,
-            )
-            raise InvalidCredentials
-        if not self.password_hash.verify(pin, account.pin_hash):
+        valid_pin = self._verify_pin(pin, account.pin_hash if account else self._dummy_hash)
+        if account is None or not valid_pin:
             self.store.record_login_failure(
                 attempt_key,
                 now,
@@ -189,6 +181,14 @@ class AccountService:
         if account is None:
             raise AccountNotFound
         return account.identity()
+
+    def _verify_pin(self, pin: str, stored_hash: str) -> bool:
+        try:
+            return self.password_hash.verify(pin, stored_hash)
+        except UnknownHashError:
+            # Imports can contain accounts without an API PIN.
+            self.password_hash.verify(pin, self._dummy_hash)
+            return False
 
     @staticmethod
     def _digest_token(token: str) -> str:
