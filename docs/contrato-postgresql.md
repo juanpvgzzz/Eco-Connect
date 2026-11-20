@@ -42,3 +42,5 @@ Las funciones lanzan `DomainError` para estados o datos de negocio y dejan los e
 ## Verificación
 
 `python -m unittest discover -s db/tests -v` crea un esquema temporal dentro de `TEST_DATABASE_URL`, corre migración y lo elimina. Nunca usa `DATABASE_URL` como sustituto. Cubre instalación limpia, restricciones, rollback, idempotencia y concurrencia. La integración con routers ajenos queda para la integración de ramas.
+
+Desde una terminal con acceso a Docker e Internet, `bash db/verify_and_publish.sh` crea un PostgreSQL temporal, instala la dependencia, ejecuta las pruebas, publica `feat/backend-base-datos` y comprueba que el SHA remoto coincide. Si ya existe una base PostgreSQL aislada, configurar `TEST_DATABASE_URL` antes de ejecutarlo; en ese caso no inicia Docker. Nunca apuntar `TEST_DATABASE_URL` a una base de desarrollo o producción.
