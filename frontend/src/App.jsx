@@ -540,17 +540,30 @@ function Dashboard({ user, token, end }) {
   }
   const rows = data?.rows || [],
     notices = data?.notices || [];
+  const flow = rows[0]?.flujo || user.collective_id;
+  const garden = flow === "huerta",
+    recycling = flow === "reciclaje";
+  const teamName = garden
+    ? "Huerta comunitaria"
+    : recycling
+      ? "Colectivo de reciclaje"
+      : "Panel del colectivo";
+  const TeamIcon = recycling
+    ? Recycle
+    : garden || !leader
+      ? Sprout
+      : ClipboardList;
   const nav = [
     ["panel", leader ? "Bandeja" : "Mis recogidas", ClipboardList],
     ["avisos", "Avisos", Bell],
   ];
   return (
     <>
-      <header className={leader ? undefined : "residentHeader"}>
+      <header className="dashboardHeader">
         <Brand />
         <div className="flex items-center gap-3">
-          <span className={leader ? "hidden sm:inline" : "residentName"}>
-            {!leader && <CircleUserRound size={18} aria-hidden="true" />}
+          <span className="dashboardName">
+            <CircleUserRound size={18} aria-hidden="true" />
             {user.profile.full_name}
           </span>
           <button
@@ -562,24 +575,32 @@ function Dashboard({ user, token, end }) {
           </button>
         </div>
       </header>
-      <main className={leader ? "shell" : "shell residentShell"}>
-        <div className={leader ? undefined : "residentHero"}>
-          {!leader && (
-            <div className="growthArt" aria-hidden="true">
-              <Sprout />
-            </div>
-          )}
+      <main
+        className="shell dashboardShell"
+        data-collective={
+          leader
+            ? garden
+              ? "huerta"
+              : recycling
+                ? "reciclaje"
+                : "otro"
+            : undefined
+        }
+      >
+        <div className="dashboardHero">
+          <div className="growthArt" aria-hidden="true">
+            <TeamIcon />
+          </div>
           <div className="context">
             <MapPin size={15} /> Villas de San Pablo{" "}
             {isDemo && <strong>Demo</strong>}
           </div>
           <div className="heading">
             <div>
-              <h1>{leader ? "Panel del colectivo" : "Mi comunidad"}</h1>
+              <h1>{leader ? teamName : "Mi comunidad"}</h1>
               <p className="muted">
                 {leader
-                  ? "Gestión de recogidas · " +
-                    (user.collective_id || "Colectivo asignado")
+                  ? "Organiza las visitas y confirma el material recogido."
                   : "Hola, " +
                     user.profile.full_name.split(" ")[0] +
                     ". Consulta y organiza tus recogidas."}
@@ -689,7 +710,7 @@ function Dashboard({ user, token, end }) {
               {rows.filter((r) => !filter || r.estado === filter).length ===
                 0 && (
                 <div className="card empty">
-                  {leader && <ClipboardList />}
+                  {leader && <TeamIcon aria-hidden="true" />}
                   <h3>
                     {filter ? "Sin coincidencias" : "Aún no hay solicitudes"}
                   </h3>
@@ -750,11 +771,27 @@ function Dashboard({ user, token, end }) {
             </section>
             <aside>
               {leader ? (
-                <div className="stat">
-                  <Sprout />
-                  <p>Solicitudes asignadas</p>
-                  <b>{rows.length}</b>
-                </div>
+                <>
+                  <div className="stat">
+                    <TeamIcon />
+                    <p>Asignadas</p>
+                    <b>{rows.length}</b>
+                  </div>
+                  <div className="stat">
+                    <CalendarDays />
+                    <p>Programadas</p>
+                    <b>
+                      {rows.filter((r) => r.estado === "programada").length}
+                    </b>
+                  </div>
+                  <div className="stat">
+                    <Check />
+                    <p>Atendidas</p>
+                    <b>
+                      {rows.filter((r) => r.estado === "recolectada").length}
+                    </b>
+                  </div>
+                </>
               ) : (
                 <>
                   <div className="stat">

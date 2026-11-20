@@ -584,13 +584,13 @@ header button:focus-visible {
 }
 
 /* Panel de comunidad */
-#root:has(.residentShell) {
+#root:has(.dashboardShell) {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   background: #f4f6ed;
 }
-.residentHeader {
+.dashboardHeader {
   background: #f4f6ed;
   color: var(--eco-forest);
   border: 0;
@@ -598,29 +598,29 @@ header button:focus-visible {
   margin-inline: auto;
   padding: 12px clamp(16px, 4vw, 48px);
 }
-.residentHeader .brand {
+.dashboardHeader .brand {
   background: transparent;
   padding: 4px 0;
 }
-.residentHeader .brand img {
+.dashboardHeader .brand img {
   width: 220px;
 }
-.residentName {
+.dashboardName {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.92rem;
   font-weight: 600;
 }
-.residentHeader .iconBtn {
+.dashboardHeader .iconBtn {
   background: transparent;
   border-color: #bbcfc0;
   border-radius: 50%;
 }
-.residentHeader button:focus-visible {
+.dashboardHeader button:focus-visible {
   outline-color: var(--eco-forest);
 }
-.residentShell {
+.dashboardShell {
   width: min(100%, 1120px);
   margin: 0 auto;
   flex: 1;
@@ -628,7 +628,7 @@ header button:focus-visible {
   display: flex;
   flex-direction: column;
 }
-.residentHero {
+.dashboardHero {
   background: #deecce;
   color: var(--eco-forest);
   overflow: hidden;
@@ -637,24 +637,24 @@ header button:focus-visible {
   padding: clamp(22px, 4vw, 44px);
   border-radius: 24px;
 }
-.residentHero .heading {
+.dashboardHero .heading {
   margin: 12px 0 0;
   display: block;
   position: relative;
 }
-.residentHero h1 {
+.dashboardHero h1 {
   font-size: clamp(29px, 4.5vw, 46px);
 }
-.residentHero .heading p {
+.dashboardHero .heading p {
   color: #335a45;
   max-width: 70%;
 }
-.residentHero .primary {
+.dashboardHero .primary {
   margin-top: 18px;
   background: var(--eco-forest);
   font-size: 1rem;
 }
-.residentHero .primary:hover {
+.dashboardHero .primary:hover {
   background: #13583e;
 }
 .growthArt {
@@ -691,27 +691,27 @@ header button:focus-visible {
   border-radius: 50%;
   background: #f6c400;
 }
-.residentShell nav {
+.dashboardShell nav {
   margin: 14px 0 18px;
   gap: 4px;
 }
-.residentShell .contentGrid {
+.dashboardShell .contentGrid {
   flex: 1;
   grid-template-columns: 1fr;
   grid-template-rows: auto 1fr;
   gap: 18px;
 }
-.residentShell aside {
+.dashboardShell aside {
   grid-row: 1;
   display: grid;
   grid-template-columns: minmax(135px, 0.75fr) minmax(0, 1.6fr);
   gap: 14px;
 }
-.residentShell aside > * {
+.dashboardShell aside > * {
   margin: 0;
   padding: clamp(16px, 2.8vw, 26px);
 }
-.residentShell aside .stat {
+.dashboardShell aside .stat {
   background: #fff1b5;
   border: 1px solid #e8d88c;
   color: var(--eco-forest);
@@ -721,34 +721,34 @@ header button:focus-visible {
   align-items: center;
   gap: 6px;
 }
-.residentShell aside .stat svg {
+.dashboardShell aside .stat svg {
   grid-column: 2;
   grid-row: 1;
   color: #786017;
   width: 20px;
 }
-.residentShell aside .stat p {
+.dashboardShell aside .stat p {
   grid-column: 1;
   grid-row: 1;
   margin: 0;
   font-weight: 600;
 }
-.residentShell aside .stat b {
+.dashboardShell aside .stat b {
   color: var(--eco-forest);
   grid-column: 1/-1;
   font:
     600 clamp(32px, 4vw, 46px) / 1.1 Poppins,
     sans-serif;
 }
-.residentShell aside .card > svg {
+.dashboardShell aside .card > svg {
   color: var(--eco-green);
 }
-.residentShell .contentGrid > section {
+.dashboardShell .contentGrid > section {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-.residentShell .empty {
+.dashboardShell .empty {
   flex: 1;
   margin: 0;
   display: grid;
@@ -788,26 +788,118 @@ header button:focus-visible {
   margin: 0;
 }
 @media (max-width: 540px) {
-  .residentName {
+  .dashboardName {
     display: none;
   }
-  .residentHeader {
+  .dashboardHeader {
     min-height: 76px;
   }
-  .residentHero .heading p {
+  .dashboardHero .heading p {
     max-width: 83%;
   }
-  .residentShell aside {
+  .dashboardShell aside {
     gap: 8px;
     grid-template-columns: minmax(0, 0.83fr) minmax(0, 1.17fr);
   }
-  .residentShell aside .stat {
+  .dashboardShell aside .stat {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     justify-content: center;
   }
-  .residentShell nav button {
+  .dashboardShell nav button {
     padding-inline: 8px;
+  }
+}
+/* Variantes del colectivo autorizado */
+.dashboardShell[data-collective] {
+  --banner: #e1efcd;
+  --ink: var(--eco-forest);
+  --accent: var(--eco-leaf);
+  --dot: var(--eco-orange);
+  --wash: #f1f7e8;
+}
+.dashboardShell[data-collective="reciclaje"] {
+  --banner: #07584b;
+  --ink: white;
+  --accent: var(--eco-teal);
+  --dot: var(--eco-yellow);
+  --wash: #e2f3ed;
+}
+#root:has([data-collective="reciclaje"]),
+#root:has([data-collective="reciclaje"]) .dashboardHeader {
+  background: #eff6f3;
+}
+[data-collective] .dashboardHero {
+  background: var(--banner);
+  color: var(--ink);
+  min-height: 180px;
+  display: grid;
+  align-content: center;
+}
+[data-collective] .dashboardHero .context,
+[data-collective] .dashboardHero .heading p {
+  color: inherit;
+}
+[data-collective] .dashboardHero .heading {
+  max-width: 75%;
+}
+[data-collective] .dashboardHero .heading p {
+  max-width: 100%;
+}
+[data-collective] .growthArt {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 24px var(--banner),
+    0 0 0 25px var(--accent);
+  width: clamp(96px, 21vw, 210px);
+  bottom: -24px;
+}
+[data-collective] .growthArt svg {
+  color: var(--accent);
+}
+[data-collective="reciclaje"] .growthArt svg {
+  color: #89d6b7;
+  transform: none;
+}
+[data-collective] .growthArt::after {
+  background: var(--dot);
+}
+[data-collective] nav button[aria-current] {
+  border-color: var(--accent);
+}
+.dashboardShell[data-collective] aside {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(6px, 1.5vw, 16px);
+}
+.dashboardShell[data-collective] aside .stat {
+  background: white;
+  border-color: #cfdbd2;
+  padding: clamp(10px, 2.5vw, 24px);
+}
+.dashboardShell[data-collective] aside .stat:first-child {
+  background: var(--wash);
+  border-color: var(--accent);
+}
+.dashboardShell[data-collective] aside .stat svg {
+  color: var(--eco-forest);
+}
+[data-collective] .empty > svg {
+  width: 60px;
+  height: 60px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--wash);
+  color: var(--eco-forest);
+}
+[data-collective] .status {
+  background: var(--wash);
+}
+@media (max-width: 540px) {
+  .dashboardShell[data-collective] aside .stat p {
+    font-size: 0.76rem;
+  }
+  [data-collective] .dashboardHero .heading {
+    max-width: 82%;
   }
 }
