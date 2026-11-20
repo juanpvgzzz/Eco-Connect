@@ -79,7 +79,7 @@ async function serve(path, { token, body, key }) {
       throw Object.assign(Error("Esta cédula ya tiene una cuenta."), {
         status: 409,
       });
-    const { pin, national_id, full_name, address, phone, kind } = body;
+    const { pin, national_id, full_name, address, phone } = body;
     const identity = {
       id: crypto.randomUUID(),
       collective_id: null,
@@ -88,8 +88,8 @@ async function serve(path, { token, body, key }) {
         full_name,
         address,
         phone,
-        kind,
-        role: kind === "business" ? "business" : "resident",
+        kind: "household",
+        role: "resident",
         pilot_enabled: false,
       },
     };

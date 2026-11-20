@@ -223,7 +223,7 @@ function Registration({ onBack, onCreated }) {
     setBusy(true);
     setError("");
     try {
-      await request("/accounts", { body: data });
+      await request("/accounts", { body: { ...data, kind: "household" } });
       onCreated(data.national_id);
     } catch (err) {
       setError(
@@ -278,15 +278,6 @@ function Registration({ onBack, onCreated }) {
               maxLength={240}
               required
             />
-          </Field>
-          <Field label="Tipo de cuenta">
-            <select name="kind" required defaultValue="">
-              <option value="" disabled>
-                Selecciona una opción
-              </option>
-              <option value="household">Hogar</option>
-              <option value="business">Unidad productiva o negocio</option>
-            </select>
           </Field>
           <Field label="PIN (4 a 12 dígitos)">
             <input
