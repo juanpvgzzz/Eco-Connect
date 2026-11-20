@@ -6,6 +6,8 @@ import {
   CalendarDays,
   Check,
   CircleUserRound,
+  House,
+  Truck,
   ClipboardList,
   Clock3,
   CircleX,
@@ -544,10 +546,13 @@ function Dashboard({ user, token, end }) {
   ];
   return (
     <>
-      <header>
+      <header className={leader ? undefined : "residentHeader"}>
         <Brand />
         <div className="flex items-center gap-3">
-          <span className="hidden sm:inline">{user.profile.full_name}</span>
+          <span className={leader ? "hidden sm:inline" : "residentName"}>
+            {!leader && <CircleUserRound size={18} aria-hidden="true" />}
+            {user.profile.full_name}
+          </span>
           <button
             className="iconBtn"
             aria-label="Cerrar sesión"
@@ -557,29 +562,36 @@ function Dashboard({ user, token, end }) {
           </button>
         </div>
       </header>
-      <main className="shell">
-        <div className="context">
-          <MapPin size={15} /> Villas de San Pablo{" "}
-          {isDemo && <strong>Demo</strong>}
-        </div>
-        <div className="heading">
-          <div>
-            <h1>{leader ? "Panel del colectivo" : "Mi comunidad"}</h1>
-            <p className="muted">
-              {leader
-                ? "Gestión de recogidas · " +
-                  (user.collective_id || "Colectivo asignado")
-                : "Hola, " +
-                  user.profile.full_name.split(" ")[0] +
-                  ". Consulta y organiza tus recogidas."}
-            </p>
-          </div>
+      <main className={leader ? "shell" : "shell residentShell"}>
+        <div className={leader ? undefined : "residentHero"}>
           {!leader && (
-            <button className="primary" onClick={() => setTab("nueva")}>
-              <Plus size={18} />
-              Solicitar recogida
-            </button>
+            <div className="growthArt" aria-hidden="true">
+              <Sprout />
+            </div>
           )}
+          <div className="context">
+            <MapPin size={15} /> Villas de San Pablo{" "}
+            {isDemo && <strong>Demo</strong>}
+          </div>
+          <div className="heading">
+            <div>
+              <h1>{leader ? "Panel del colectivo" : "Mi comunidad"}</h1>
+              <p className="muted">
+                {leader
+                  ? "Gestión de recogidas · " +
+                    (user.collective_id || "Colectivo asignado")
+                  : "Hola, " +
+                    user.profile.full_name.split(" ")[0] +
+                    ". Consulta y organiza tus recogidas."}
+              </p>
+            </div>
+            {!leader && (
+              <button className="primary" onClick={() => setTab("nueva")}>
+                <Plus size={18} />
+                Solicitar recogida
+              </button>
+            )}
+          </div>
         </div>
         <nav>
           {nav.map(([v, t, I]) => (
@@ -677,7 +689,7 @@ function Dashboard({ user, token, end }) {
               {rows.filter((r) => !filter || r.estado === filter).length ===
                 0 && (
                 <div className="card empty">
-                  <ClipboardList />
+                  {leader && <ClipboardList />}
                   <h3>
                     {filter ? "Sin coincidencias" : "Aún no hay solicitudes"}
                   </h3>
@@ -686,6 +698,25 @@ function Dashboard({ user, token, end }) {
                       ? "Las solicitudes asignadas a tu colectivo aparecerán aquí."
                       : "Solicita una recogida de residuos orgánicos o reciclables."}
                   </p>
+                  {!leader && (
+                    <ol
+                      className="pickupRoute"
+                      aria-label="Cómo funciona la recogida"
+                    >
+                      <li>
+                        <House aria-hidden="true" />
+                        Prepara el material
+                      </li>
+                      <li>
+                        <Truck aria-hidden="true" />
+                        Consulta tu cita
+                      </li>
+                      <li>
+                        <Sprout aria-hidden="true" />
+                        Recibe tus puntos
+                      </li>
+                    </ol>
+                  )}
                 </div>
               )}
               {rows
