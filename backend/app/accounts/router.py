@@ -73,4 +73,5 @@ def update_authorization(
         account_id=account_id,
         role=request.role,
         pilot_enabled=request.pilot_enabled,
+        collective_id=request.collective_id,
     )

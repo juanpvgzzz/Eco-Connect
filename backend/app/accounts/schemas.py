@@ -51,3 +51,4 @@ class AuthorizationRequest(BaseModel):
 
     role: AccountRole
     pilot_enabled: bool
+    collective_id: str | None

@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from pwdlib import PasswordHash
 
+from backend.app.errors import InvalidInput
 from backend.app.accounts.models import (
     AccountIdentity,
     AccountKind,
@@ -81,7 +82,7 @@ class AccountService:
             "phone": phone.strip(),
         }
         if not all(cleaned.values()):
-            raise ValueError("name, address, and phone are required")
+            raise InvalidInput("name, address, and phone are required")
         role = AccountRole.BUSINESS if kind is AccountKind.BUSINESS else AccountRole.RESIDENT
         account = AccountRecord(
             id=str(uuid4()),
@@ -101,17 +102,25 @@ class AccountService:
 
     def login(self, national_id: str, pin: str) -> "LoginResult":
         normalized_id = normalize_national_id(national_id)
+        attempt_key = self._attempt_key(normalized_id)
         now = datetime.now(timezone.utc)
-        if self.store.is_login_locked(normalized_id, now):
+        if self.store.is_login_locked(attempt_key, now):
             raise TooManyLoginAttempts
 
         account = self.store.find_by_national_id(normalized_id)
         if account is None:
             self.password_hash.verify(pin, self._dummy_hash)
+            self.store.record_login_failure(
+                attempt_key,
+                now,
+                self.max_attempts,
+                self.failure_window,
+                self.lockout,
+            )
             raise InvalidCredentials
         if not self.password_hash.verify(pin, account.pin_hash):
             self.store.record_login_failure(
-                normalized_id,
+                attempt_key,
                 now,
                 self.max_attempts,
                 self.failure_window,
@@ -119,7 +128,7 @@ class AccountService:
             )
             raise InvalidCredentials
 
-        self.store.clear_login_failures(normalized_id)
+        self.store.clear_login_failures(attempt_key)
         token = secrets.token_urlsafe(32)
         self.store.save_session(
             SessionRecord(
@@ -158,6 +167,7 @@ class AccountService:
         account_id: str,
         role: AccountRole,
         pilot_enabled: bool,
+        collective_id: str | None,
     ) -> AccountIdentity:
         if actor.profile.role is not AccountRole.ADMIN:
             raise ForbiddenAction
@@ -167,10 +177,15 @@ class AccountService:
         if (
             role is AccountRole.BUSINESS and current.kind is not AccountKind.BUSINESS
         ) or (role is AccountRole.RESIDENT and current.kind is not AccountKind.HOUSEHOLD):
-            raise ValueError("account role must match its registered kind")
+            raise InvalidInput("account role must match its registered kind")
         if pilot_enabled and current.kind is not AccountKind.BUSINESS:
-            raise ValueError("only businesses can be enabled for the pilot")
-        account = self.store.set_authorization(account_id, role, pilot_enabled)
+            raise InvalidInput("only businesses can be enabled for the pilot")
+        collective_id = collective_id.strip() if collective_id else None
+        if role is AccountRole.LEADER and collective_id is None:
+            raise InvalidInput("leader profiles must be assigned to a collective")
+        account = self.store.set_authorization(
+            account_id, role, pilot_enabled, collective_id
+        )
         if account is None:
             raise AccountNotFound
         return account.identity()
@@ -179,17 +194,21 @@ class AccountService:
     def _digest_token(token: str) -> str:
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def _attempt_key(national_id: str) -> str:
+        return hashlib.sha256(national_id.encode("ascii")).hexdigest()
+
 
 def normalize_national_id(value: str) -> str:
     normalized = re.sub(r"[.\-\s]", "", value)
     if not normalized or not re.fullmatch(r"[0-9]{1,20}", normalized):
-        raise ValueError("national id must contain only digits and common separators")
+        raise InvalidInput("national id must contain only digits and common separators")
     return normalized
 
 
 def validate_pin(pin: str) -> None:
     if not re.fullmatch(r"[0-9]{4,12}", pin):
-        raise ValueError("PIN must contain between 4 and 12 digits")
+        raise InvalidInput("PIN must contain between 4 and 12 digits")
 
 
 @dataclass(frozen=True, slots=True)

@@ -4,6 +4,7 @@ import pytest
 
 from backend.app.accounts.models import AccountKind, AccountRole
 from backend.app.accounts.ports import DuplicateNationalId
+from backend.app.errors import InvalidInput
 from backend.app.accounts.service import (
     AccountAlreadyExists,
     AccountService,
@@ -33,10 +34,11 @@ class MemoryAccountStore:
         self.accounts[account.national_id] = account
         return account
 
-    def set_authorization(self, account_id, role, pilot_enabled):
+    def set_authorization(self, account_id, role, pilot_enabled, collective_id):
         account = next(item for item in self.accounts.values() if item.id == account_id)
         account.role = role
         account.pilot_enabled = pilot_enabled
+        account.collective_id = collective_id
         return account
 
     def is_login_locked(self, national_id, now):
@@ -112,7 +114,7 @@ def test_unknown_and_wrong_credentials_have_same_error(service_and_store):
     service, store = service_and_store
     with pytest.raises(InvalidCredentials):
         service.login("123456789", "9999")
-    assert "123456789" not in store.failures
+    assert len(next(iter(store.failures.values()))) == 1
 
     service.register(
         national_id="123456789",
@@ -124,7 +126,16 @@ def test_unknown_and_wrong_credentials_have_same_error(service_and_store):
     )
     with pytest.raises(InvalidCredentials):
         service.login("123456789", "9999")
-    assert len(store.failures["123456789"]) == 1
+    assert len(next(iter(store.failures.values()))) == 2
+
+
+def test_unknown_document_attempts_hit_same_lockout_threshold(service_and_store):
+    service, _ = service_and_store
+    for _ in range(5):
+        with pytest.raises(InvalidCredentials):
+            service.login("123456789", "9999")
+    with pytest.raises(TooManyLoginAttempts):
+        service.login("123456789", "9999")
 
 
 def test_failed_logins_are_limited_and_valid_pin_is_blocked_during_lockout(service_and_store):
@@ -205,19 +216,29 @@ def test_admin_cannot_enable_pilot_or_business_role_for_household(service_and_st
     store.find_by_id(admin.id).role = AccountRole.ADMIN
     admin = store.find_by_id(admin.id).identity()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidInput):
         service.set_authorization(
             actor=admin,
             account_id=user.id,
             role=AccountRole.BUSINESS,
             pilot_enabled=True,
+            collective_id=None,
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidInput):
         service.set_authorization(
             actor=admin,
             account_id=user.id,
             role=AccountRole.BUSINESS,
             pilot_enabled=False,
+            collective_id=None,
+        )
+    with pytest.raises(InvalidInput):
+        service.set_authorization(
+            actor=admin,
+            account_id=user.id,
+            role=AccountRole.LEADER,
+            pilot_enabled=False,
+            collective_id=None,
         )
 
     saved = store.find_by_id(user.id)
@@ -250,6 +271,7 @@ def test_non_admin_cannot_change_authorization(service_and_store):
             account_id=target.id,
             role=AccountRole.LEADER,
             pilot_enabled=False,
+            collective_id="collective-1",
         )
 
     assert store.find_by_id(target.id).role is AccountRole.RESIDENT

@@ -5,9 +5,15 @@ from enum import StrEnum
 
 class CollectionStatus(StrEnum):
     RECEIVED = "received"
+    UNDER_REVIEW = "under_review"
     SCHEDULED = "scheduled"
     COLLECTED = "collected"
     CANCELLED = "cancelled"
+
+
+class WasteFlow(StrEnum):
+    ORGANIC = "organic"
+    RECYCLABLE = "recyclable"
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,6 +21,7 @@ class CreateCollectionCommand:
     description: str
     contact: str
     address: str
+    flow: WasteFlow
     preferred_from: datetime
     preferred_until: datetime
 
@@ -22,7 +29,7 @@ class CreateCollectionCommand:
 @dataclass(frozen=True, slots=True)
 class AppointmentRecord:
     scheduled_at: datetime
-    responsible_name: str | None
+    responsible_name: str
 
 
 @dataclass(frozen=True, slots=True)

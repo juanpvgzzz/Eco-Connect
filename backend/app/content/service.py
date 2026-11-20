@@ -1,9 +1,11 @@
+from dataclasses import replace
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from backend.app.accounts.models import AccountIdentity, AccountRole
 from backend.app.content.models import ContentCategory, ContentRecord, ContentStatus
 from backend.app.content.ports import ContentStore
+from backend.app.errors import InvalidInput
 
 
 class ContentError(Exception):
@@ -77,11 +79,14 @@ class ContentService:
         item = self.store.find_content(content_id)
         if item is None:
             raise ContentNotFound
-        item.title = self._required_text(title, "title")
-        item.category = category
-        item.body = self._required_text(body, "body")
-        item.updated_at = datetime.now(timezone.utc)
-        return self.store.save_content(item)
+        updated = replace(
+            item,
+            title=self._required_text(title, "title"),
+            category=category,
+            body=self._required_text(body, "body"),
+            updated_at=datetime.now(timezone.utc),
+        )
+        return self.store.save_content(updated)
 
     def publish(self, *, actor: AccountIdentity, content_id: str) -> ContentRecord:
         self._require_admin(actor)
@@ -101,5 +106,5 @@ class ContentService:
     def _required_text(value: str, field: str) -> str:
         value = value.strip()
         if not value:
-            raise ValueError(f"{field} is required")
+            raise InvalidInput(f"{field} is required")
         return value

@@ -10,16 +10,16 @@ Backend compartido de EcoConecta para cuentas, guía ambiental y flujos HTTP de 
 - `backend/app/content/`: guía ambiental con borradores y publicaciones.
 - `backend/app/community/`: HTTP autenticado para solicitudes, citas, avisos, puntos y canjes.
 - `backend/tests/`: pruebas por área con almacenes y gateways falsos.
-- `db/migrations/`: historial SQL coordinado por funcionalidad si se mantiene esta estrategia.
+- `db/migrations/`: historial PostgreSQL mantenido por Codex 3.
 - `docs/`: acuerdos de desarrollo e integración.
 
 ## Responsabilidades
 
 - **Codex 1:** composición, configuración, sesiones, Docker base, cuentas, piloto y contenidos (`accounts/`, `content/`).
 - **Codex 2:** solicitudes, agenda y cierre de recolecciones (`collections/`) y su interfaz de cierre.
-- **Codex 3:** puntos, premios y canjes (`points/`) y la función de acreditación.
+- **Codex 3:** persistencia, conexión PostgreSQL, modelos compartidos y migraciones; además, puntos, premios y canjes (`points/`).
 
-Cada responsable mantiene las pruebas y migraciones de su área y coordina el orden de integración.
+Cada responsable mantiene sus pruebas y coordina con Codex 3 los cambios de persistencia y migración.
 
 ## Preparar y ejecutar
 

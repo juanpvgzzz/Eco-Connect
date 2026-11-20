@@ -18,21 +18,25 @@ class AccountStore(Protocol):
     def create_account(self, account: AccountRecord) -> AccountRecord: ...
 
     def set_authorization(
-        self, account_id: str, role: AccountRole, pilot_enabled: bool
+        self,
+        account_id: str,
+        role: AccountRole,
+        pilot_enabled: bool,
+        collective_id: str | None,
     ) -> AccountRecord | None: ...
 
-    def is_login_locked(self, national_id: str, now: datetime) -> bool: ...
+    def is_login_locked(self, attempt_key: str, now: datetime) -> bool: ...
 
     def record_login_failure(
         self,
-        national_id: str,
+        attempt_key: str,
         now: datetime,
         max_attempts: int,
         window: timedelta,
         lockout: timedelta,
     ) -> None: ...
 
-    def clear_login_failures(self, national_id: str) -> None: ...
+    def clear_login_failures(self, attempt_key: str) -> None: ...
 
     def save_session(self, session: SessionRecord) -> None: ...
 

@@ -55,8 +55,8 @@ class RedemptionCode:
 class CommunityService:
     def __init__(
         self,
-        collections: CommunityCollectionsGateway,
-        points: CommunityPointsGateway,
+        collections: CommunityCollectionsGateway | None = None,
+        points: CommunityPointsGateway | None = None,
     ) -> None:
         self.collections = collections
         self.points = points
@@ -65,7 +65,7 @@ class CommunityService:
         self, *, actor: AccountIdentity, request: CreateCollectionCommand
     ) -> CollectionRecord:
         try:
-            item = self.collections.create_for_user(actor, request)
+            item = self._collections().create_for_user(actor, request)
         except BusinessNotEnabled:
             raise CommunityNotEligible from None
         return self._owned(item, actor.id)
@@ -73,37 +73,32 @@ class CommunityService:
     def list_collections(self, *, actor: AccountIdentity) -> list[CollectionRecord]:
         return [
             self._owned(item, actor.id)
-            for item in self.collections.list_for_user(actor.id)
+            for item in self._collections().list_for_user(actor.id)
             if item.owner_id == actor.id
         ]
 
     def get_collection(self, *, actor: AccountIdentity, request_id: str) -> CollectionRecord:
-        item = self.collections.get_for_user(actor.id, request_id)
+        item = self._collections().get_for_user(actor.id, request_id)
         if item is None or item.owner_id != actor.id:
             raise CommunityNotFound
-        return item
+        return self._owned(item, actor.id)
 
     def list_notifications(self, *, actor: AccountIdentity) -> list[NotificationRecord]:
         return [
             item
-            for item in self.collections.list_notifications_for_user(actor.id)
+            for item in self._collections().list_notifications_for_user(actor.id)
             if item.owner_id == actor.id
         ]
 
     def list_appointments(self, *, actor: AccountIdentity) -> list[AppointmentView]:
-        return [
-            AppointmentView(
-                collection_id=item.id,
-                status=item.status,
-                scheduled_at=self._barranquilla(item.appointment.scheduled_at),
-                responsible_name=item.appointment.responsible_name,
-            )
-            for item in self.collections.list_appointments_for_user(actor.id)
-            if item.owner_id == actor.id and item.appointment is not None
-        ]
+        appointments = []
+        for item in self._collections().list_appointments_for_user(actor.id):
+            if item.owner_id == actor.id and item.status == CollectionStatus.SCHEDULED:
+                appointments.append(self._appointment_view(item))
+        return appointments
 
     def points_balance(self, *, actor: AccountIdentity) -> PointsRecord:
-        points = self.points.get_points_for_user(actor.id)
+        points = self._points().get_points_for_user(actor.id)
         if points.owner_id != actor.id or points.balance < 0:
             raise IntegrationContractError
         return points
@@ -111,12 +106,12 @@ class CommunityService:
     def points_history(self, *, actor: AccountIdentity) -> list[PointsMovementRecord]:
         return [
             item
-            for item in self.points.list_movements_for_user(actor.id)
+            for item in self._points().list_movements_for_user(actor.id)
             if item.owner_id == actor.id
         ]
 
     def rewards(self) -> list[RewardRecord]:
-        rewards = self.points.list_rewards()
+        rewards = self._points().list_rewards()
         if any(reward.cost < 0 for reward in rewards):
             raise IntegrationContractError
         return rewards
@@ -125,10 +120,12 @@ class CommunityService:
         self, *, actor: AccountIdentity, reward_id: str
     ) -> RedemptionCode:
         try:
-            result = self.points.request_code_for_user(actor.id, reward_id)
+            result = self._points().request_code_for_user(actor.id, reward_id)
         except InsufficientPoints:
             raise CommunityInsufficientPoints from None
         if result.owner_id != actor.id:
+            raise IntegrationContractError
+        if result.reward_id != reward_id or not result.code.strip():
             raise IntegrationContractError
         return RedemptionCode(
             code=result.code,
@@ -141,7 +138,27 @@ class CommunityService:
     def _owned(item: CollectionRecord, owner_id: str) -> CollectionRecord:
         if item.owner_id != owner_id:
             raise IntegrationContractError
+        if item.status == CollectionStatus.SCHEDULED:
+            if item.appointment is None:
+                raise IntegrationContractError
+            CommunityService._appointment_view(item)
         return item
+
+    @staticmethod
+    def _appointment_view(item: CollectionRecord) -> "AppointmentView":
+        appointment = item.appointment
+        if (
+            appointment is None
+            or not appointment.responsible_name
+            or not appointment.responsible_name.strip()
+        ):
+            raise IntegrationContractError
+        return AppointmentView(
+            collection_id=item.id,
+            status=item.status,
+            scheduled_at=CommunityService._barranquilla(appointment.scheduled_at),
+            responsible_name=appointment.responsible_name.strip(),
+        )
 
     @staticmethod
     def _barranquilla(value: datetime) -> datetime:
@@ -149,10 +166,20 @@ class CommunityService:
             raise IntegrationContractError
         return value.astimezone(BARRANQUILLA)
 
+    def _collections(self) -> CommunityCollectionsGateway:
+        if self.collections is None:
+            raise IntegrationContractError
+        return self.collections
+
+    def _points(self) -> CommunityPointsGateway:
+        if self.points is None:
+            raise IntegrationContractError
+        return self.points
+
 
 @dataclass(frozen=True, slots=True)
 class AppointmentView:
     collection_id: str
     status: CollectionStatus
     scheduled_at: datetime
-    responsible_name: str | None
+    responsible_name: str

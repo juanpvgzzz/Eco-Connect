@@ -24,6 +24,7 @@ from backend.app.community.service import (
 from backend.app.content.ports import ContentStore
 from backend.app.content.router import router as content_router
 from backend.app.content.service import ContentError, ContentNotFound, ForbiddenContentAction
+from backend.app.errors import InvalidInput
 
 
 def create_app(
@@ -61,9 +62,9 @@ def create_app(
         headers = {"WWW-Authenticate": "Bearer"} if status_code == 401 else None
         return JSONResponse(status_code=status_code, content={"detail": detail}, headers=headers)
 
-    @app.exception_handler(ValueError)
-    async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
-        return JSONResponse(status_code=422, content={"detail": str(exc)})
+    @app.exception_handler(InvalidInput)
+    async def invalid_input_handler(request: Request, exc: InvalidInput) -> JSONResponse:
+        return JSONResponse(status_code=422, content={"detail": "Invalid request"})
 
     @app.exception_handler(ContentError)
     async def content_error_handler(request: Request, exc: ContentError) -> JSONResponse:

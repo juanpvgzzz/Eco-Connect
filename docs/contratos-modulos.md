@@ -7,9 +7,9 @@ Este documento fija las interfaces que consume HTTP. Los adaptadores PostgreSQL 
 `AccountStore` debe implementar `find_by_national_id`, `find_by_id`, `create_account`, `set_authorization`, `is_login_locked`, `record_login_failure`, `clear_login_failures`, `save_session`, `find_session` y `revoke_session`.
 
 - `national_id` se recibe normalizado a solo dígitos y requiere una restricción única en PostgreSQL. `create_account` traduce colisión a `DuplicateNationalId` ante registros concurrentes.
-- `record_login_failure` actualiza contadores y bloqueo de forma atómica por cédula, usando el umbral y ventana recibidos. Nunca almacena PIN en claro.
+- `is_login_locked`, `record_login_failure` y `clear_login_failures` usan la clave SHA-256 `attempt_key` entregada por la aplicación. Actualizan el contador de forma atómica con el umbral y ventana recibidos e incluyen identificadores existentes y desconocidos para conservar respuestas uniformes. El adaptador debe podar filas vencidas para limitar crecimiento. Nunca almacena PIN en claro.
 - Persistir el digest SHA-256 del token y `expires_at`/`revoked_at`; no persistir el token sin transformar. `find_session` solo devuelve sesiones existentes.
-- `set_authorization` cambia rol y piloto en la cuenta ya existente. El adaptador crea la cuenta administrativa inicial mediante un proceso operativo confiable, nunca desde registro público.
+- `set_authorization` cambia rol, piloto y `collective_id` en la cuenta ya existente. El rol líder requiere un colectivo válido. El adaptador crea la cuenta administrativa inicial mediante un proceso operativo confiable, nunca desde registro público.
 
 ## Contenidos — persistencia compartida (Codex 3)
 
@@ -17,9 +17,11 @@ Este documento fija las interfaces que consume HTTP. Los adaptadores PostgreSQL 
 
 ## Recolecciones, citas y avisos — Codex 2
 
-`CommunityCollectionsGateway` recibe `AccountIdentity` en `create_for_user(actor, request)` para que Codex 2 aplique elegibilidad del comercio piloto y guarde/avise mediante su operación de alta. Para lectura, `list_for_user(owner_id)`, `get_for_user(owner_id, request_id)`, `list_notifications_for_user(owner_id)` y `list_appointments_for_user(owner_id)` deben filtrar en origen por el propietario solicitado. Una empresa no habilitada lanza `BusinessNotEnabled`. Estados consumidos: `received`, `scheduled`, `collected`, `cancelled`. Las citas deben incluir fecha con zona horaria y responsable; HTTP las convierte a `America/Bogota`.
+`CommunityCollectionsGateway` recibe `AccountIdentity` en `create_for_user(actor, request)` para que Codex 2 aplique elegibilidad del comercio piloto y guarde/avise mediante su operación de alta. Para lectura, `list_for_user(owner_id)`, `get_for_user(owner_id, request_id)`, `list_notifications_for_user(owner_id)` y `list_appointments_for_user(owner_id)` deben filtrar en origen por el propietario solicitado. Una empresa no habilitada lanza `BusinessNotEnabled`. Estados consumidos: `received`, `under_review`, `scheduled`, `collected`, `cancelled`. Las citas deben incluir fecha con zona horaria y responsable; solo entonces el estado puede ser `scheduled`. HTTP las convierte a `America/Bogota`.
 
-La solicitud HTTP contiene descripción, contacto, dirección y ventana de disponibilidad futura con zona explícita. La identidad autenticada determina al usuario; se ignora cualquier `owner_id` enviado por el cliente.
+La solicitud HTTP contiene flujo (`organic` o `recyclable`), descripción, contacto, dirección y ventana de disponibilidad futura con zona explícita. La identidad autenticada aporta tipo de generador y colectivo, y determina al usuario; se ignora cualquier `owner_id` enviado por el cliente. El adaptador enruta orgánicos a huerteros y reciclables a recicladores.
+
+Un registro con estado `scheduled` requiere fecha/hora con zona y persona encargada. La cita se presenta al usuario en `America/Bogota`; respuestas de otros estados no cuentan como cita programada.
 
 ## Puntos y canjes — Codex 3 y Codex 2
 
@@ -27,4 +29,4 @@ La solicitud HTTP contiene descripción, contacto, dirección y ventana de dispo
 
 ## Inyección en la app
 
-El adaptador compartido crea la app con `create_app(account_store=..., content_store=..., collections_gateway=..., points_gateway=...)`. Hasta entonces, las rutas dependientes responden `503`; no se usa persistencia en memoria en producción.
+El adaptador compartido crea la app con `create_app(account_store=..., content_store=..., collections_gateway=..., points_gateway=...)`. Las rutas de recolección requieren solo `collections_gateway`; las rutas de puntos solo `points_gateway`. Si falta el adaptador requerido por una ruta, esta responde `503`; no se usa persistencia en memoria en producción.

@@ -15,6 +15,8 @@
 - Solo la administración crea perfiles de administrador o líder y habilita comercios piloto.
 - No duplicar modelos, conexión ni migraciones que pertenecen a Codex 3.
 - Las operaciones de datos propios filtran por el id autenticado.
+- Cada solicitud incluye flujo orgánico o reciclable y se entrega al coordinador correspondiente.
+- Una cita no está programada sin fecha, hora y persona encargada.
 - Pruebas con datos ficticios y almacenes aislados.
 - Las funcionalidades de recolecciones y puntos esperan los contratos reales de Codex 2 y Codex 3.
 
@@ -51,7 +53,7 @@
 
 **Files:** `backend/app/community/`; `backend/app/main.py`; `backend/tests/accounts/test_community_api.py`; `docs/contratos-modulos.md`; `docs/desarrollo.md`; `README.md`.
 
-- [x] Probar ownership en solicitudes/avisos/citas/movimientos, validación de disponibilidad, hora local y canje sin débito.
+- [x] Probar ownership, ambos flujos, citas completas, validación de disponibilidad, hora local y canje sin débito.
 - [x] Implementar gateways explícitos para Codex 2/3; no duplicar sus reglas ni persistencia.
 - [x] Incluir routers, composición, contratos y comandos de instalación, prueba y arranque.
 - [x] Verificar pruebas, importación de OpenAPI y `git diff --check`.

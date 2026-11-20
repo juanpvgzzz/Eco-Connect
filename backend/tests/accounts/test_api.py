@@ -54,6 +54,22 @@ def test_registration_rejects_invalid_pin():
     assert response.status_code == 422
 
 
+def test_adapter_value_error_does_not_leak_internal_details():
+    client, store = make_client()
+
+    def fail_lookup(_national_id):
+        raise ValueError("database connection password leaked")
+
+    store.find_by_national_id = fail_lookup
+    client = TestClient(client.app, raise_server_exceptions=False)
+    response = client.post(
+        "/accounts/login", json={"national_id": "123456789", "pin": "1234"}
+    )
+
+    assert response.status_code == 500
+    assert "database connection password leaked" not in response.text
+
+
 def test_login_profile_and_logout_revokes_token():
     client, _ = make_client()
     assert register(client).status_code == 201
@@ -88,13 +104,18 @@ def test_only_admin_can_authorize_profiles_and_enable_pilot():
     token = login.json()["access_token"]
     updated = client.put(
         f"/accounts/admin/{target.id}/authorization",
-        json={"role": "leader", "pilot_enabled": True},
+        json={
+            "role": "leader",
+            "pilot_enabled": True,
+            "collective_id": "collective-recyclers",
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
 
     assert updated.status_code == 200
     assert updated.json()["profile"]["role"] == "leader"
     assert updated.json()["profile"]["pilot_enabled"] is True
+    assert updated.json()["collective_id"] == "collective-recyclers"
 
 
 def test_openapi_exposes_account_content_and_community_routes():

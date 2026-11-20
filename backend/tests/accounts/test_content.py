@@ -6,6 +6,7 @@ import pytest
 from backend.app.accounts.models import AccountIdentity, AccountProfile, AccountKind, AccountRole
 from backend.app.content.models import ContentCategory, ContentStatus
 from backend.app.content.service import ContentService, ForbiddenContentAction, ContentNotFound
+from backend.app.errors import InvalidInput
 
 
 @dataclass
@@ -102,6 +103,30 @@ def test_public_listing_filters_drafts_even_if_store_returns_them(admin):
     store.list_published = lambda category=None: list(store.items.values())
 
     assert service.list_public() == []
+
+
+def test_invalid_edit_does_not_mutate_published_content(admin):
+    store = MemoryContentStore()
+    service = ContentService(store)
+    published = service.create_draft(
+        actor=admin,
+        title="Título aprobado",
+        category=ContentCategory.MATERIALS,
+        body="Texto publicado.",
+    )
+    service.publish(actor=admin, content_id=published.id)
+
+    with pytest.raises(InvalidInput):
+        service.update_draft(
+            actor=admin,
+            content_id=published.id,
+            title="Título cambiado",
+            category=ContentCategory.SEPARATION,
+            body="   ",
+        )
+
+    assert service.get_public(content_id=published.id).title == "Título aprobado"
+    assert service.get_public(content_id=published.id).category is ContentCategory.MATERIALS
 
 
 def test_non_admin_cannot_manage_or_read_drafts(admin, resident):

@@ -175,6 +175,7 @@ def test_collection_create_and_lists_are_limited_to_current_user():
             "description": "Botellas plásticas limpias",
             "contact": "3001234567",
             "address": "Calle 1 # 2-3",
+            "flow": "organic",
             "preferred_from": start,
             "preferred_until": end,
         },
@@ -198,6 +199,7 @@ def test_collection_rejects_invalid_availability():
             "description": "Botellas",
             "contact": "3001234567",
             "address": "Calle 1",
+            "flow": "organic",
             "preferred_from": end,
             "preferred_until": start,
         },
@@ -215,6 +217,7 @@ def test_non_pilot_business_is_rejected_by_collections_contract():
             "description": "Botellas plásticas limpias",
             "contact": "3001234567",
             "address": "Calle 1 # 2-3",
+            "flow": "organic",
             "preferred_from": start,
             "preferred_until": end,
         },
@@ -231,12 +234,32 @@ def test_collection_rejects_past_availability():
             "description": "Botellas",
             "contact": "3001234567",
             "address": "Calle 1",
+            "flow": "organic",
             "preferred_from": "2020-01-01T09:00:00-05:00",
             "preferred_until": "2020-01-01T11:00:00-05:00",
         },
         headers=headers,
     )
     assert response.status_code == 422
+
+
+def test_recyclable_flow_is_forwarded_to_collections_gateway():
+    client, collections, _, headers = make_client()
+    start, end = future_window()
+    response = client.post(
+        "/community/collections",
+        json={
+            "description": "Envases de vidrio",
+            "contact": "3001234567",
+            "address": "Calle 1 # 2-3",
+            "flow": "recyclable",
+            "preferred_from": start,
+            "preferred_until": end,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201
+    assert collections.created_by[0][1].flow == "recyclable"
 
 
 def test_appointments_show_barranquilla_time_and_only_own_notifications():
@@ -248,6 +271,15 @@ def test_appointments_show_barranquilla_time_and_only_own_notifications():
     assert appointments.json()[0]["scheduled_at"] == "2026-11-20T14:00:00-05:00"
     assert notifications.status_code == 200
     assert [item["id"] for item in notifications.json()] == ["note-own"]
+
+
+def test_scheduled_appointment_requires_responsible_person():
+    client, collections, _, headers = make_client()
+    collections.own.appointment.responsible_name = None
+
+    response = client.get("/community/appointments", headers=headers)
+
+    assert response.status_code == 502
 
 
 def test_points_history_is_private_and_redemption_code_does_not_debit():
@@ -277,3 +309,43 @@ def test_insufficient_points_is_a_controlled_conflict():
     )
 
     assert response.status_code == 409
+
+
+def test_points_catalog_works_with_points_gateway_alone():
+    from fastapi.testclient import TestClient
+
+    app = create_app(points_gateway=FakePointsGateway())
+    response = TestClient(app).get("/community/rewards")
+    assert response.status_code == 200
+    assert response.json()[0]["id"] == "reward-1"
+
+
+def test_collection_api_works_with_collections_gateway_alone():
+    from fastapi.testclient import TestClient
+
+    accounts = MemoryAccountStore()
+    collections = FakeCollectionsGateway()
+    client = TestClient(
+        create_app(account_store=accounts, collections_gateway=collections)
+    )
+    register(client)
+    login = client.post(
+        "/accounts/login", json={"national_id": "123456789", "pin": "1234"}
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    start, end = future_window()
+
+    response = client.post(
+        "/community/collections",
+        json={
+            "description": "Residuos orgánicos",
+            "contact": "3001234567",
+            "address": "Calle 1 # 2-3",
+            "flow": "organic",
+            "preferred_from": start,
+            "preferred_until": end,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 201

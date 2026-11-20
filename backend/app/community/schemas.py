@@ -2,8 +2,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from backend.app.community.models import CreateCollectionCommand
-from backend.app.community.models import CollectionStatus
+from backend.app.community.models import CollectionStatus, CreateCollectionCommand, WasteFlow
 
 
 class CollectionRequest(BaseModel):
@@ -12,6 +11,7 @@ class CollectionRequest(BaseModel):
     description: str = Field(min_length=5, max_length=2000)
     contact: str = Field(min_length=3, max_length=40)
     address: str = Field(min_length=5, max_length=240)
+    flow: WasteFlow
     preferred_from: datetime
     preferred_until: datetime
 
@@ -37,6 +37,7 @@ class CollectionRequest(BaseModel):
             description=self.description,
             contact=self.contact,
             address=self.address,
+            flow=self.flow,
             preferred_from=self.preferred_from,
             preferred_until=self.preferred_until,
         )
@@ -46,7 +47,7 @@ class AppointmentResponse(BaseModel):
     collection_id: str
     status: CollectionStatus
     scheduled_at: datetime
-    responsible_name: str | None
+    responsible_name: str
 
 
 class CollectionResponse(BaseModel):
