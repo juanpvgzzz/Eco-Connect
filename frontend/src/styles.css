@@ -819,6 +819,13 @@ header button:focus-visible {
   --dot: var(--eco-orange);
   --wash: #f1f7e8;
 }
+.dashboardShell[data-collective="huerta"] {
+  --banner: #ffe7b7;
+  --ink: var(--eco-forest);
+  --accent: #98601c;
+  --dot: var(--eco-orange);
+  --wash: #fff4dd;
+}
 .dashboardShell[data-collective="reciclaje"] {
   --banner: #07584b;
   --ink: white;
@@ -901,113 +908,5 @@ header button:focus-visible {
   }
   [data-collective] .dashboardHero .heading {
     max-width: 82%;
-  }
-}
-
-/* La huerta organiza el trabajo por visitas y conserva el resumen junto a la bandeja. */
-.gardenAgenda {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  border: 1px solid #b3c8a5;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #fffae9;
-}
-.gardenTitle {
-  display: grid;
-  align-content: center;
-  gap: 18px;
-  padding: clamp(20px, 4vw, 46px);
-  color: white;
-  background: var(--eco-forest);
-}
-.gardenTitle .context {
-  color: #d9efd2;
-}
-.gardenTitle h1 {
-  font-size: clamp(30px, 4vw, 50px);
-  line-height: 1.04;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-}
-.gardenVisit {
-  display: grid;
-  align-content: center;
-  gap: 10px;
-  padding: clamp(20px, 3vw, 38px);
-  border-inline-start: 6px solid var(--eco-orange);
-  overflow-wrap: anywhere;
-}
-.gardenVisit h2 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #4c422d;
-  font-size: 1rem;
-}
-.gardenVisit p {
-  font-size: 0.95rem;
-  color: #4f564a;
-}
-.dashboardShell[data-collective="huerta"] .contentGrid {
-  grid-template-columns: minmax(156px, 0.65fr) minmax(0, 2fr);
-  grid-template-rows: 1fr;
-  align-items: start;
-}
-.dashboardShell[data-collective="huerta"] aside {
-  grid-column: 1;
-  grid-row: 1;
-  grid-template-columns: 1fr;
-  gap: 0;
-  background: #e8efdb;
-  border: 1px solid #bdcda9;
-  border-radius: 14px;
-  padding: 4px 14px;
-}
-.dashboardShell[data-collective="huerta"] aside .stat {
-  border: 0;
-  border-bottom: 1px solid #bdcda9;
-  border-radius: 0;
-  background: transparent;
-  padding: 17px 0;
-}
-.dashboardShell[data-collective="huerta"] aside .stat:last-child {
-  border-bottom: 0;
-}
-.dashboardShell[data-collective="huerta"] .contentGrid > section {
-  grid-column: 2;
-  grid-row: 1;
-}
-.dashboardShell[data-collective="huerta"] .empty {
-  min-height: 220px;
-  align-content: center;
-  border-radius: 12px;
-  border-left: 5px solid var(--eco-leaf);
-}
-.dashboardShell[data-collective="huerta"] .row {
-  border-left: 5px solid var(--eco-leaf);
-  border-radius: 12px;
-}
-@media (max-width: 610px) {
-  .gardenAgenda {
-    grid-template-columns: 1fr;
-  }
-  .gardenVisit {
-    border-inline-start: 0;
-    border-top: 4px solid var(--eco-orange);
-  }
-  .dashboardShell[data-collective="huerta"] .contentGrid {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .dashboardShell[data-collective="huerta"] aside {
-    order: -1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding: 8px;
-  }
-  .dashboardShell[data-collective="huerta"] aside .stat {
-    border: 0;
-    padding: 6px;
   }
 }
