@@ -7,7 +7,9 @@ import {
   Check,
   CircleUserRound,
   ClipboardList,
-  Leaf,
+  Clock3,
+  CircleX,
+  CircleAlert,
   LogOut,
   MapPin,
   Plus,
@@ -16,9 +18,10 @@ import {
   Sprout,
   Ticket,
 } from "lucide-react";
-import "@fontsource/dm-sans/400.css";
-import "@fontsource/dm-sans/600.css";
-import "@fontsource/dm-sans/700.css";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/poppins/latin-600.css";
+import "@fontsource/poppins/latin-700.css";
 import { request, isDemo } from "./data";
 import { demoProfiles } from "./demo";
 import "./styles.css";
@@ -47,8 +50,25 @@ const sessionKey = isDemo ? "eco.demo.session" : "eco.api.session";
 function Brand() {
   return (
     <span className="brand">
-      <Sprout aria-hidden="true" />
-      EcoConecta
+      <img
+        src="/marca/ecoconecta.png"
+        alt="EcoConecta Villas de San Pablo"
+        width="2172"
+        height="724"
+      />
+    </span>
+  );
+}
+function CollectionStatus({ value }) {
+  const label = nameOf[value] || value;
+  const Icon =
+    { Programada: CalendarDays, Recolectada: Check, Cancelada: CircleX }[
+      label
+    ] || Clock3;
+  return (
+    <span className="status">
+      <Icon size={15} aria-hidden="true" />
+      {label}
     </span>
   );
 }
@@ -81,7 +101,6 @@ function Login({ onLogin }) {
   return (
     <main className="login">
       <section className="photo">
-        <Brand />
         <div className="caption">
           <span>
             <MapPin size={17} /> BARRANQUILLA
@@ -95,9 +114,7 @@ function Login({ onLogin }) {
       </section>
       <section className="loginPanel">
         <div className="loginInner">
-          <div className="leafBox">
-            <Leaf />
-          </div>
+          <Brand />
           <h2>Iniciar sesión</h2>
           <p className="muted">
             Ingresa con tu cédula y PIN para acceder a tu cuenta.
@@ -122,7 +139,12 @@ function Login({ onLogin }) {
                 onChange={(e) => setPin(e.target.value)}
               />
             </Field>
-            {error && <p role="alert">{error}</p>}
+            {error && (
+              <p role="alert">
+                <CircleAlert size={18} aria-hidden="true" />
+                {error}
+              </p>
+            )}
             <button className="primary w-full" disabled={busy}>
               Entrar <ArrowRight size={18} />
             </button>
@@ -450,8 +472,18 @@ function Dashboard({ user, token, end }) {
             <RefreshCw size={17} />
           </button>
         </nav>
-        {error && <p role="alert">{error}</p>}
-        {feedback && <p role="status">{feedback}</p>}
+        {error && (
+          <p role="alert">
+            <CircleAlert size={18} aria-hidden="true" />
+            {error}
+          </p>
+        )}
+        {feedback && (
+          <p role="status">
+            <Check size={18} aria-hidden="true" />
+            {feedback}
+          </p>
+        )}
         {tab === "nueva" && !leader ? (
           <RequestForm
             user={user}
@@ -531,9 +563,7 @@ function Dashboard({ user, token, end }) {
                 .filter((r) => !filter || r.estado === filter)
                 .map((r) => (
                   <article className="card row" key={r.id}>
-                    <span className="status">
-                      {nameOf[r.estado || r.status]}
-                    </span>
+                    <CollectionStatus value={r.estado || r.status} />
                     <h3>
                       {r.description ||
                         r.solicitud?.material ||
@@ -631,7 +661,12 @@ function App() {
     <Dashboard {...session} end={end} />
   ) : (
     <>
-      {initError && <p role="alert">{initError}</p>}
+      {initError && (
+        <p role="alert">
+          <CircleAlert size={18} aria-hidden="true" />
+          {initError}
+        </p>
+      )}
       <Login
         onLogin={async (body) => {
           setInitError("");
@@ -642,4 +677,22 @@ function App() {
     </>
   );
 }
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(
+  <>
+    <App />
+    <footer className="partners" aria-label="Identidad institucional">
+      <img
+        src="/marca/villas-de-san-pablo.png"
+        alt="Villas de San Pablo"
+        width="467"
+        height="169"
+      />
+      <img
+        src="/marca/santo-domingo.png"
+        alt="Fundaci?n Santo Domingo"
+        width="586"
+        height="317"
+      />
+    </footer>
+  </>,
+);
