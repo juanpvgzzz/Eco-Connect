@@ -1,0 +1,412 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root {
+  font-family: "DM Sans", sans-serif;
+  color: #203c33;
+  background: #f6f7f0;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  min-height: 46px;
+  border-radius: 10px;
+  font-weight: 600;
+  padding: 0.65rem 1rem;
+}
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #38866c;
+  outline-offset: 3px;
+}
+.primary,
+.secondary,
+.chip,
+.choice,
+.context,
+.brand,
+.photo span,
+.notice,
+.row p,
+.listTitle,
+header,
+.heading,
+nav,
+nav button,
+.iconBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.primary,
+.secondary,
+.choice,
+.chip,
+.iconBtn {
+  justify-content: center;
+}
+.primary {
+  background: #225340;
+  color: white;
+  min-height: 49px;
+}
+.primary:hover {
+  background: #153f30;
+}
+.secondary,
+.choice,
+.chip,
+.iconBtn {
+  border: 1px solid #cfd9cd;
+  background: #fff;
+}
+.choice[aria-pressed="true"] {
+  background: #dcefdc;
+  border-color: #63936e;
+}
+.login {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding: 18px;
+  gap: 16px;
+}
+.photo {
+  border-radius: 22px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(28px, 4vw, 70px);
+  color: white;
+  background:
+    linear-gradient(
+      175deg,
+      rgba(14, 38, 27, 0.48),
+      rgba(12, 32, 24, 0.03) 38%,
+      rgba(12, 37, 26, 0.85)
+    ),
+    url("/huerta.jpg") center/cover;
+}
+.brand {
+  font-size: 1.45rem;
+  letter-spacing: -0.06em;
+  font-weight: 700;
+}
+.brand svg {
+  height: 36px;
+  width: 36px;
+  background: #d4ed9e;
+  color: #274d39;
+  border-radius: 10px;
+  padding: 6px;
+}
+.caption span,
+.context {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+.caption h1 {
+  font-size: clamp(3.4rem, 6vw, 7rem);
+  line-height: 0.98;
+  letter-spacing: -0.07em;
+  margin: 18px 0;
+}
+.caption p {
+  font-size: 1.05rem;
+}
+.loginPanel {
+  display: grid;
+  place-items: center;
+  padding: 36px;
+}
+.loginInner {
+  width: min(100%, 410px);
+}
+.loginInner h2,
+.heading h1 {
+  font-size: clamp(2.25rem, 4vw, 3.6rem);
+  letter-spacing: -0.065em;
+  line-height: 1.1;
+  font-weight: 600;
+}
+.leafBox {
+  display: inline-flex;
+  color: #356248;
+  background: #e2ead8;
+  padding: 12px;
+  border-radius: 14px;
+  margin-bottom: 23px;
+}
+.muted {
+  color: #52665c;
+}
+.loginInner > p {
+  margin: 12px 0 27px;
+}
+.field,
+legend {
+  display: block;
+  font-weight: 600;
+  font-size: 0.91rem;
+}
+.field {
+  margin-bottom: 17px;
+}
+legend {
+  margin-bottom: 10px;
+}
+input,
+textarea,
+select {
+  min-height: 47px;
+  background: white;
+  border: 1px solid #bfcbbf;
+  border-radius: 9px;
+  padding: 10px 13px;
+  width: 100%;
+  color: #1a3329;
+}
+.field input,
+.field select,
+.field textarea {
+  display: block;
+  margin-top: 6px;
+}
+.demo {
+  margin-top: 30px;
+  border-top: 1px solid #ced8cb;
+  padding-top: 20px;
+}
+.demo h3 {
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+.chip {
+  font-size: 0.84rem;
+  padding: 8px 11px;
+}
+header {
+  height: 75px;
+  justify-content: space-between;
+  padding: 0 max(5%, calc((100% - 1120px) / 2));
+  background: #fff;
+  border-bottom: 1px solid #dae0d5;
+}
+.iconBtn {
+  width: 46px;
+  padding: 8px;
+}
+.shell {
+  max-width: 1180px;
+  margin: auto;
+  padding: 40px 30px 70px;
+}
+.context {
+  letter-spacing: 0.035em;
+  color: #526c58;
+}
+.context strong {
+  border: 1px solid #bdcbb7;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.heading,
+.listTitle {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.heading {
+  margin: 15px 0 24px;
+}
+.heading p {
+  margin: 10px 0;
+}
+.heading h1 {
+  font-size: clamp(2.2rem, 4vw, 3.5rem);
+}
+nav {
+  border-bottom: 1px solid #bfcbbf;
+  margin-bottom: 26px;
+}
+nav button {
+  border-radius: 0;
+  color: #55675d;
+  border-bottom: 3px solid transparent;
+}
+nav button[aria-current] {
+  border-color: #2c6347;
+  color: #1c4933;
+}
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(240px, 1fr);
+  gap: 24px;
+}
+.card,
+.stat {
+  padding: 25px;
+  border-radius: 18px;
+  background: white;
+  border: 1px solid #d7dfd3;
+  margin-bottom: 15px;
+  overflow-wrap: anywhere;
+}
+h2,
+h3,
+b {
+  font-weight: 700;
+}
+h2 {
+  font-size: 1.45rem;
+  letter-spacing: -0.04em;
+}
+.card h2 {
+  margin-bottom: 18px;
+}
+h3 {
+  font-size: 1.15rem;
+}
+.listTitle {
+  margin-bottom: 14px;
+}
+.listTitle select {
+  width: auto;
+}
+.stat {
+  background: #204d3b;
+  color: white;
+}
+.stat svg {
+  color: #d4ed9e;
+}
+.stat p {
+  margin-top: 18px;
+}
+.stat b {
+  font-size: 3.3rem;
+  line-height: 1.2;
+}
+.empty svg,
+aside .card > svg {
+  color: #648455;
+  margin-bottom: 10px;
+}
+.status {
+  display: inline-block;
+  background: #e7efe0;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  color: #31543b;
+  font-weight: 700;
+}
+.row h3 {
+  margin: 12px 0;
+}
+.row p,
+.row small,
+.appointment {
+  margin-bottom: 8px;
+}
+.actions {
+  border-top: 1px solid #e0e5db;
+  margin-top: 15px;
+  padding-top: 15px;
+}
+.notice {
+  padding: 14px 0;
+  border-top: 1px solid #e0e5db;
+}
+.notice > svg {
+  flex: none;
+}
+.appointment {
+  margin-top: 12px;
+}
+form.card {
+  max-width: 680px;
+}
+[role="alert"],
+[role="status"] {
+  padding: 12px 16px;
+  border-radius: 9px;
+  margin: 12px 0;
+  background: #f6e8dc;
+  color: #763f21;
+}
+[role="status"] {
+  background: #e1edda;
+  color: #244f36;
+}
+@media (max-width: 760px) {
+  .login {
+    display: block;
+    padding: 10px;
+  }
+  .photo {
+    min-height: 225px;
+    padding: 21px;
+    border-radius: 16px;
+  }
+  .caption h1 {
+    font-size: 2.8rem;
+    margin: 8px 0;
+  }
+  .caption h1 br {
+    display: none;
+  }
+  .caption h1 br:after {
+    content: " ";
+  }
+  .caption span {
+    font-size: 0.65rem;
+  }
+  .loginPanel {
+    padding: 26px 15px;
+  }
+  .leafBox {
+    display: none;
+  }
+  .shell {
+    padding: 26px 16px;
+  }
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+  .heading {
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .card,
+  .stat {
+    padding: 18px;
+  }
+  header {
+    padding: 0 16px;
+    height: 65px;
+  }
+  .listTitle select {
+    max-width: 140px;
+  }
+}
