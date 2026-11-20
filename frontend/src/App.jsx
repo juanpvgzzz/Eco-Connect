@@ -480,6 +480,43 @@ function Actions({ row, run, pending }) {
   );
 }
 
+function GardenAgenda({ rows, loaded }) {
+  const now = Date.now();
+  const upcoming = rows
+    .filter((r) => r.estado === "programada" && Date.parse(r.cita) >= now)
+    .sort((a, b) => Date.parse(a.cita) - Date.parse(b.cita))[0];
+  return (
+    <div className="gardenAgenda">
+      <div className="gardenTitle">
+        <div className="context">
+          <Sprout size={20} /> Villas de San Pablo{" "}
+          {isDemo && <strong>Demo</strong>}
+        </div>
+        <h1>Huerta comunitaria</h1>
+      </div>
+      <section className="gardenVisit">
+        <h2>
+          <CalendarDays size={19} /> Próxima visita
+        </h2>
+        {upcoming ? (
+          <>
+            <b>{date(upcoming.cita)}</b>
+            <p>
+              {upcoming.solicitud?.material} · {upcoming.solicitud?.direccion}
+            </p>
+          </>
+        ) : (
+          <p>
+            {loaded
+              ? "Sin visitas próximas en la agenda."
+              : "Consultando agenda…"}
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function Dashboard({ user, token, end }) {
   const leader = user.profile.role === "leader",
     [tab, setTab] = useState("panel"),
@@ -587,33 +624,37 @@ function Dashboard({ user, token, end }) {
             : undefined
         }
       >
-        <div className="dashboardHero">
-          <div className="growthArt" aria-hidden="true">
-            <TeamIcon />
-          </div>
-          <div className="context">
-            <MapPin size={15} /> Villas de San Pablo{" "}
-            {isDemo && <strong>Demo</strong>}
-          </div>
-          <div className="heading">
-            <div>
-              <h1>{leader ? teamName : "Mi comunidad"}</h1>
-              <p className="muted">
-                {leader
-                  ? "Organiza las visitas y confirma el material recogido."
-                  : "Hola, " +
-                    user.profile.full_name.split(" ")[0] +
-                    ". Consulta y organiza tus recogidas."}
-              </p>
+        {leader && garden ? (
+          <GardenAgenda rows={rows} loaded={Boolean(data)} />
+        ) : (
+          <div className="dashboardHero">
+            <div className="growthArt" aria-hidden="true">
+              <TeamIcon />
             </div>
-            {!leader && (
-              <button className="primary" onClick={() => setTab("nueva")}>
-                <Plus size={18} />
-                Solicitar recogida
-              </button>
-            )}
+            <div className="context">
+              <MapPin size={15} /> Villas de San Pablo{" "}
+              {isDemo && <strong>Demo</strong>}
+            </div>
+            <div className="heading">
+              <div>
+                <h1>{leader ? teamName : "Mi comunidad"}</h1>
+                <p className="muted">
+                  {leader
+                    ? "Organiza las visitas y confirma el material recogido."
+                    : "Hola, " +
+                      user.profile.full_name.split(" ")[0] +
+                      ". Consulta y organiza tus recogidas."}
+                </p>
+              </div>
+              {!leader && (
+                <button className="primary" onClick={() => setTab("nueva")}>
+                  <Plus size={18} />
+                  Solicitar recogida
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
         <nav>
           {nav.map(([v, t, I]) => (
             <button
