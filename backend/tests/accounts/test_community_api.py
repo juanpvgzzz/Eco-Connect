@@ -75,6 +75,7 @@ class FakeCollectionsGateway:
     def __init__(self):
         now = datetime(2026, 11, 20, 12, tzinfo=timezone.utc)
         self.created_by = []
+        self.idempotency_keys = []
         self.own = FakeCollection(
             "req-own", "user-id", "scheduled", "Botellas plásticas", "Calle 1", now,
             FakeAppointment(datetime(2026, 11, 20, 19, tzinfo=timezone.utc), "Equipo A"),
@@ -83,10 +84,11 @@ class FakeCollectionsGateway:
             "req-other", "someone-else", "received", "Dato ajeno", "Calle privada", now
         )
 
-    def create_for_user(self, actor, request):
+    def create_for_user(self, actor, request, idempotency_key=None):
         if actor.profile.kind is AccountKind.BUSINESS and not actor.profile.pilot_enabled:
             raise BusinessNotEnabled
         self.created_by.append((actor.id, request))
+        self.idempotency_keys.append(idempotency_key)
         return FakeCollection(
             "req-new", actor.id, "received", request.description, request.address,
             datetime.now(timezone.utc),
@@ -179,11 +181,12 @@ def test_collection_create_and_lists_are_limited_to_current_user():
             "preferred_from": start,
             "preferred_until": end,
         },
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "request-unique-1"},
     )
 
     assert response.status_code == 201
     assert collections.created_by[0][0] == "user-id"
+    assert collections.idempotency_keys == ["request-unique-1"]
     listed = client.get("/community/collections?owner_id=someone-else", headers=headers)
     assert [item["id"] for item in listed.json()] == ["req-own"]
     assert collections.requested_owner_id == "user-id"
@@ -203,8 +206,28 @@ def test_collection_rejects_invalid_availability():
             "preferred_from": end,
             "preferred_until": start,
         },
+        headers={**headers, "Idempotency-Key": "invalid-window"},
+    )
+    assert response.status_code == 422
+
+
+def test_collection_creation_requires_idempotency_key():
+    client, _, _, headers = make_client()
+    start, end = future_window()
+
+    response = client.post(
+        "/community/collections",
+        json={
+            "description": "Botellas plásticas limpias",
+            "contact": "3001234567",
+            "address": "Calle 1 # 2-3",
+            "flow": "organic",
+            "preferred_from": start,
+            "preferred_until": end,
+        },
         headers=headers,
     )
+
     assert response.status_code == 422
 
 
@@ -221,7 +244,7 @@ def test_non_pilot_business_is_rejected_by_collections_contract():
             "preferred_from": start,
             "preferred_until": end,
         },
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "pilot-check"},
     )
     assert response.status_code == 403
 
@@ -238,7 +261,7 @@ def test_collection_rejects_past_availability():
             "preferred_from": "2020-01-01T09:00:00-05:00",
             "preferred_until": "2020-01-01T11:00:00-05:00",
         },
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "past-window"},
     )
     assert response.status_code == 422
 
@@ -256,10 +279,43 @@ def test_recyclable_flow_is_forwarded_to_collections_gateway():
             "preferred_from": start,
             "preferred_until": end,
         },
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "request-unique-2"},
     )
     assert response.status_code == 201
+    assert collections.idempotency_keys == ["request-unique-2"]
     assert collections.created_by[0][1].flow == "recyclable"
+
+
+def test_missing_community_adapters_return_service_unavailable():
+    from fastapi.testclient import TestClient
+
+    accounts = MemoryAccountStore()
+    client = TestClient(create_app(account_store=accounts))
+    register(client)
+    login = client.post(
+        "/accounts/login", json={"national_id": "123456789", "pin": "1234"}
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    start, end = future_window()
+
+    collection = client.post(
+        "/community/collections",
+        json={
+            "description": "Residuos orgánicos",
+            "contact": "3001234567",
+            "address": "Calle 1 # 2-3",
+            "flow": "organic",
+            "preferred_from": start,
+            "preferred_until": end,
+        },
+        headers={**headers, "Idempotency-Key": "unconfigured"},
+    )
+    points = client.get("/community/points", headers=headers)
+
+    assert collection.status_code == 503
+    assert collection.json()["detail"] == "Collections service contract is not configured"
+    assert points.status_code == 503
+    assert points.json()["detail"] == "Points service contract is not configured"
 
 
 def test_appointments_show_barranquilla_time_and_only_own_notifications():
@@ -269,6 +325,9 @@ def test_appointments_show_barranquilla_time_and_only_own_notifications():
 
     assert appointments.status_code == 200
     assert appointments.json()[0]["scheduled_at"] == "2026-11-20T14:00:00-05:00"
+    assert appointments.json()[0]["collection_id"] == "req-own"
+    assert appointments.json()[0]["status"] == "scheduled"
+    assert appointments.json()[0]["responsible_name"] == "Equipo A"
     assert notifications.status_code == 200
     assert [item["id"] for item in notifications.json()] == ["note-own"]
 
@@ -345,7 +404,8 @@ def test_collection_api_works_with_collections_gateway_alone():
             "preferred_from": start,
             "preferred_until": end,
         },
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "request-unique-3"},
     )
 
     assert response.status_code == 201
+    assert collections.idempotency_keys == ["request-unique-3"]

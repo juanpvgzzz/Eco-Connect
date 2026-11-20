@@ -24,7 +24,10 @@ class CommunityCollectionsGateway(Protocol):
     """Adapter contract for Codex 2; every query receives the authenticated owner."""
 
     def create_for_user(
-        self, actor: AccountIdentity, request: CreateCollectionCommand
+        self,
+        actor: AccountIdentity,
+        request: CreateCollectionCommand,
+        idempotency_key: str,
     ) -> CollectionRecord: ...
 
     def list_for_user(self, owner_id: str) -> list[CollectionRecord]: ...
