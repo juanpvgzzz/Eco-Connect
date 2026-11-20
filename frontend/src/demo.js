@@ -5,7 +5,7 @@ const samples = [
   ["30001", "Sara Díaz", "leader", "reciclaje"],
 ];
 export const demoProfiles = [
-  "Cliente",
+  "Vecino",
   "Líder de huerta",
   "Líder de reciclaje",
 ].map((label, i) => ({

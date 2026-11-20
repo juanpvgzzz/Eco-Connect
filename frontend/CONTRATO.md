@@ -4,6 +4,8 @@ Desde este directorio, con Node 22 y npm, ejecutar `npm ci` y `npm run dev`. `np
 
 ## Acceso a datos
 
+Para entrar con un clic como vecino, líder de huerta o líder de reciclaje en el servidor de desarrollo con API, define `VITE_DEMO_SHORTCUTS=true` en `.env.local`. Los botones inician sesión con las cuentas ficticias 10001, 20001 y 30001 respectivamente, todas con PIN 1234. Esas cuentas deben existir en la base del piloto.
+
 `src/data.js` intercambia el adaptador local por HTTP si se define `VITE_API_URL` en `.env.local` antes de iniciar o compilar. La URL puede ser un origen o un prefijo como `/api`. El modo HTTP usa sesión Bearer y propaga los errores. Consultas basadas en cuentas `63743b6`, recolecciones `4312edc` y PostgreSQL `2df1b7f`.
 
 | Pantalla | Operación HTTP |

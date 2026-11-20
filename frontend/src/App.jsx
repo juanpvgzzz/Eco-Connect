@@ -90,12 +90,11 @@ function Login({ onLogin }) {
     [pin, setPin] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  async function submit(e) {
-    e.preventDefault();
+  async function login(nationalId, loginPin) {
     setBusy(true);
     setError("");
     try {
-      await onLogin({ national_id: id, pin });
+      await onLogin({ national_id: nationalId, pin: loginPin });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -130,7 +129,10 @@ function Login({ onLogin }) {
                 <h1>Iniciar sesión</h1>
                 <p className="muted">Ingresa con tu cédula y PIN.</p>
                 {success && <p role="status">{success}</p>}
-                <form onSubmit={submit}>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  login(id, pin);
+                }}>
                   <Field label="Cédula">
                     <input
                       autoComplete="username"
@@ -171,9 +173,9 @@ function Login({ onLogin }) {
                 >
                   Registrarse
                 </button>
-                {isDemo && (
+                {(isDemo || (import.meta.env.DEV && import.meta.env.VITE_DEMO_SHORTCUTS === "true")) && (
                   <section className="demo">
-                    <h3>Perfiles de demostración</h3>
+                    <h3>Acceso rápido</h3>
                     <div className="profileChoices">
                       {demoProfiles.map((p, i) => {
                         const Icon = [CircleUserRound, Sprout, Recycle][i];
@@ -181,12 +183,9 @@ function Login({ onLogin }) {
                           <button
                             type="button"
                             className="chip"
-                            aria-pressed={id === p.national_id && pin === p.pin}
+                            disabled={busy}
                             key={p.label}
-                            onClick={() => {
-                              setId(p.national_id);
-                              setPin(p.pin);
-                            }}
+                            onClick={() => login(p.national_id, p.pin)}
                           >
                             <Icon size={16} />
                             {p.label}
@@ -825,6 +824,51 @@ function Dashboard({ user, token, end }) {
   );
 }
 
+function NotificationPermission({ userId, children }) {
+  const preferenceKey = sessionKey + ".notificationPrompt";
+  const [showPrompt, setShowPrompt] = useState(() =>
+    window.isSecureContext &&
+    window.Notification?.permission === "default" &&
+    typeof window.Notification.requestPermission === "function" &&
+    sessionStorage.getItem(preferenceKey) !== userId
+  );
+  const [pending, setPending] = useState(false);
+
+  function continueToPanel() {
+    sessionStorage.setItem(preferenceKey, userId);
+    setShowPrompt(false);
+  }
+
+  async function requestPermission() {
+    setPending(true);
+    try {
+      if (Notification.permission === "default") {
+        await Notification.requestPermission();
+      }
+    } catch {
+      // Algunos navegadores restringen la petición incluso en un contexto seguro.
+    }
+    continueToPanel();
+  }
+
+  if (!showPrompt) return children;
+  return (
+    <main className="login">
+      <section className="card" aria-labelledby="notification-title">
+        <Bell aria-hidden="true" />
+        <h1 id="notification-title">¿Permitir notificaciones de EcoConecta?</h1>
+        <p className="muted">Puedes consultar los avisos de tus recogidas dentro del panel en cualquier momento.</p>
+        <div className="actions flex flex-wrap gap-2">
+          <button className="primary" disabled={pending} onClick={requestPermission}>
+            Permitir notificaciones
+          </button>
+          <button className="secondary" onClick={continueToPanel}>Ahora no</button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function App() {
   const [session, setSession] = useState(null),
     [loading, setLoading] = useState(true),
@@ -855,7 +899,9 @@ function App() {
   }, []);
   if (loading) return <main className="shell">Cargando sesión…</main>;
   return session ? (
-    <Dashboard {...session} end={end} />
+    <NotificationPermission key={session.user.id} userId={session.user.id}>
+      <Dashboard {...session} end={end} />
+    </NotificationPermission>
   ) : (
     <>
       {initError && (

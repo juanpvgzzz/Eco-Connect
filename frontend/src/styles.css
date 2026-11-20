@@ -166,7 +166,8 @@ nav button,
 .profileChoices button svg {
   color: var(--eco-forest);
 }
-.profileChoices button[aria-pressed="true"] {
+.profileChoices button:hover,
+.profileChoices button:focus-visible {
   background: #e6f2e5;
   border-color: var(--eco-green);
 }
