@@ -51,7 +51,6 @@ textarea:focus-visible {
 .choice,
 .context,
 .brand,
-.photo span,
 .notice,
 .row p,
 .listTitle,
@@ -91,29 +90,85 @@ nav button,
   border-color: #63936e;
 }
 .login {
-  min-height: 100svh;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  padding: 18px;
-  gap: 16px;
+  place-items: center;
+  min-height: calc(100svh - 110px);
+  padding: clamp(16px, 5vw, 72px);
+  background: #edf3ed;
 }
-.photo {
-  border-radius: 22px;
-  position: relative;
+.loginCard {
+  width: min(100%, 960px);
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
   overflow: hidden;
+  border: 1px solid #cbd9cf;
+  border-radius: 24px;
+  background: white;
+  box-shadow: 0 16px 52px #063b2e0d;
+}
+.loginIdentity {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  padding: 40px 20px;
+  background: #f6faf3;
+}
+.loginIdentity::before,
+.loginIdentity::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 220px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 24px solid #dfecd9;
+}
+.loginIdentity::before {
+  top: -135px;
+  left: -100px;
+}
+.loginIdentity::after {
+  bottom: -150px;
+  right: -110px;
+  border-color: #faedb6;
+}
+.loginIdentity .brand {
+  background: transparent;
+  padding: 14px;
+}
+.loginIdentity .brand img {
+  width: clamp(248px, 29vw, 345px);
+}
+.territory {
   display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #476555;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.profileChoices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.profileChoices button {
   flex-direction: column;
-  justify-content: flex-end;
-  padding: clamp(28px, 4vw, 70px);
-  color: white;
-  background:
-    linear-gradient(
-      175deg,
-      rgba(14, 38, 27, 0.48),
-      rgba(12, 32, 24, 0.03) 38%,
-      rgba(12, 37, 26, 0.85)
-    ),
-    url("/huerta.jpg") center/cover;
+  gap: 5px;
+  padding: 9px 4px;
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+.profileChoices button svg {
+  color: var(--eco-forest);
+}
+.profileChoices button[aria-pressed="true"] {
+  background: #e6f2e5;
+  border-color: var(--eco-green);
 }
 .brand {
   display: inline-flex;
@@ -126,9 +181,6 @@ nav button,
   width: 246px;
   max-width: 100%;
   height: auto;
-}
-.loginInner .brand {
-  margin-bottom: 20px;
 }
 .partners {
   background: white;
@@ -155,30 +207,20 @@ h3 {
   color: var(--eco-forest);
   border-color: var(--eco-forest);
 }
-.caption span,
 .context {
   font-size: 0.78rem;
   letter-spacing: 0.1em;
   font-weight: 700;
 }
-.caption h1 {
-  font-size: clamp(3.4rem, 6vw, 7rem);
-  line-height: 0.98;
-  letter-spacing: -0.07em;
-  margin: 18px 0;
-}
-.caption p {
-  font-size: 1.05rem;
-}
 .loginPanel {
   display: grid;
   place-items: center;
-  padding: 36px;
+  padding: clamp(24px, 4vw, 52px);
 }
 .loginInner {
   width: min(100%, 410px);
 }
-.loginInner h2,
+.loginInner h1,
 .heading h1 {
   font-size: clamp(28px, 4vw, 32px);
   letter-spacing: -0.035em;
@@ -395,29 +437,31 @@ form.card {
 }
 @media (max-width: 760px) {
   .login {
-    display: block;
-    padding: 10px;
+    padding: 16px 12px;
+    min-height: auto;
   }
-  .photo {
-    min-height: 225px;
-    padding: 21px;
-    border-radius: 16px;
+  .loginCard {
+    max-width: 520px;
+    grid-template-columns: 1fr;
+    border-radius: 20px;
   }
-  .caption h1 {
-    font-size: 2.8rem;
-    margin: 8px 0;
+  .loginIdentity {
+    padding: 18px 10px 16px;
+    gap: 0;
+    border-bottom: 1px solid #e0e9dc;
   }
-  .caption h1 br {
-    display: none;
-  }
-  .caption h1 br:after {
-    content: " ";
-  }
-  .caption span {
-    font-size: 0.65rem;
+  .loginIdentity .brand {
+    padding: 8px 14px;
   }
   .loginPanel {
-    padding: 26px 15px;
+    padding: 24px clamp(16px, 5vw, 30px);
+  }
+  .loginInner > p {
+    margin: 8px 0 20px;
+  }
+  .demo {
+    margin-top: 20px;
+    padding-top: 16px;
   }
   header .brand {
     padding: 10px 12px;
@@ -452,9 +496,6 @@ header button:focus-visible {
   outline-color: var(--eco-yellow);
 }
 .stat:has(.lucide-ticket) b {
-  color: var(--eco-yellow);
-}
-.caption span svg {
   color: var(--eco-yellow);
 }
 .notice > svg {

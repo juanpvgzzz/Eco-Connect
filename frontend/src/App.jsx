@@ -100,81 +100,75 @@ function Login({ onLogin }) {
   }
   return (
     <main className="login">
-      <section className="photo">
-        <div className="caption">
-          <span>
-            <MapPin size={17} /> BARRANQUILLA
-          </span>
-          <h1>
-            Villas de <br />
-            San Pablo
-          </h1>
-          <p>Red comunitaria de huerta y reciclaje</p>
-        </div>
-      </section>
-      <section className="loginPanel">
-        <div className="loginInner">
+      <div className="loginCard">
+        <section className="loginIdentity" aria-label="EcoConecta">
           <Brand />
-          <h2>Iniciar sesión</h2>
-          <p className="muted">
-            Ingresa con tu cédula y PIN para acceder a tu cuenta.
-          </p>
-          <form onSubmit={submit}>
-            <Field label="Cédula">
-              <input
-                autoComplete="username"
-                inputMode="numeric"
-                required
-                value={id}
-                onChange={(e) => setId(e.target.value)}
-              />
-            </Field>
-            <Field label="PIN">
-              <input
-                type="password"
-                autoComplete="current-password"
-                inputMode="numeric"
-                required
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-              />
-            </Field>
-            {error && (
-              <p role="alert">
-                <CircleAlert size={18} aria-hidden="true" />
-                {error}
-              </p>
+          <div className="territory">
+            <MapPin size={15} aria-hidden="true" /> Barranquilla
+          </div>
+        </section>
+        <section className="loginPanel">
+          <div className="loginInner">
+            <h1>Iniciar sesión</h1>
+            <p className="muted">Ingresa con tu cédula y PIN.</p>
+            <form onSubmit={submit}>
+              <Field label="Cédula">
+                <input
+                  autoComplete="username"
+                  inputMode="numeric"
+                  required
+                  value={id}
+                  onChange={(e) => setId(e.target.value)}
+                />
+              </Field>
+              <Field label="PIN">
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  inputMode="numeric"
+                  required
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                />
+              </Field>
+              {error && (
+                <p role="alert">
+                  <CircleAlert size={18} aria-hidden="true" />
+                  {error}
+                </p>
+              )}
+              <button className="primary w-full" disabled={busy}>
+                Entrar <ArrowRight size={18} />
+              </button>
+            </form>
+            {isDemo && (
+              <section className="demo">
+                <h3>Perfiles de demostración</h3>
+                <div className="profileChoices">
+                  {demoProfiles.map((p, i) => {
+                    const Icon = [CircleUserRound, Sprout, Recycle][i];
+                    return (
+                      <button
+                        type="button"
+                        className="chip"
+                        aria-pressed={id === p.national_id && pin === p.pin}
+                        key={p.label}
+                        onClick={() => {
+                          setId(p.national_id);
+                          setPin(p.pin);
+                        }}
+                      >
+                        <Icon size={16} />
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
             )}
-            <button className="primary w-full" disabled={busy}>
-              Entrar <ArrowRight size={18} />
-            </button>
-          </form>
-          {isDemo && (
-            <section className="demo">
-              <h3>Perfiles de demostración</h3>
-              <div className="flex flex-wrap gap-2">
-                {demoProfiles.map((p, i) => {
-                  const Icon = [CircleUserRound, Sprout, Recycle][i];
-                  return (
-                    <button
-                      type="button"
-                      className="chip"
-                      key={p.label}
-                      onClick={() => {
-                        setId(p.national_id);
-                        setPin(p.pin);
-                      }}
-                    >
-                      <Icon size={16} />
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

@@ -24,5 +24,3 @@ Un borrador tiene una clave por usuario y contenido. El mismo envío conserva su
 - El panel de cliente recibe responsible_name; el de líderes solo recibe el UUID responsable. Confirmar si se publicará su nombre en la bandeja de líderes. El catálogo de identificadores de colectivos también requiere una etiqueta legible para mostrar en el panel.
 - La demo asigna un responsable ficticio por turno y diez puntos por kilo con redondeo hacia abajo. En modo HTTP el servidor asigna el turno y devuelve el saldo y las citas. Confirmar las reglas de puntos y la respuesta ante un turno no disponible en el despliegue integrado.
 - Prueba de aceptación integrada: crear solicitud como cliente, confirmar su aislamiento entre colectivos, agendar como líder, consultar la cita y el responsable como cliente, cerrar como líder y verificar estado, puntos y avisos internos como cliente.
-
-Foto de portada: [Unsplash](https://images.unsplash.com/photo-1416879595882-3373a0480b5b).
