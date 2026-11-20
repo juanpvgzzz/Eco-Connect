@@ -1,4 +1,5 @@
 """Montaje desde la API común: app.include_router(router(service, authenticated_actor))."""
+from collections.abc import Mapping
 from datetime import datetime
 from uuid import UUID
 
@@ -7,7 +8,7 @@ from fastapi.routing import APIRoute
 from pydantic import Field
 
 from .service import (
-    Actor, Collections, Delivery, Direct, Input, Key, Problem, Reason, Record,
+    Actor, Collections, Delivery, Direct, Flow, Input, Key, Problem, Reason, Record,
     Notice, Request, Schedule, State, Text, leader, local,
 )
 
@@ -31,6 +32,20 @@ class Stock(Input):
 
 class Redemption(Input):
     codigo: Text
+
+
+def account_actor(get_current_identity, collectives: Mapping[str, Flow]):
+    """Adaptar la sesión de cuentas con el catálogo confiable de colectivos."""
+    def authenticated(identity=Depends(get_current_identity)) -> Actor:
+        role = identity.profile.role
+        if role in ("resident", "business"):
+            return Actor(UUID(identity.id), "cliente")
+        flow = collectives.get(identity.collective_id)
+        if role == "leader" and flow in ("huerta", "reciclaje"):
+            return Actor(UUID(identity.id), "lider", flow)
+        raise HTTPException(403, detail="Perfil sin acceso a recolecciones")
+
+    return authenticated
 
 
 def router(service: Collections, authenticated_actor) -> APIRouter:

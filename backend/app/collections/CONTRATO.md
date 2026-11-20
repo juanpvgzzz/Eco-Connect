@@ -21,4 +21,22 @@ Los errores funcionales usan `Problem` y las rutas los traducen a `{"detail": ".
 
 ## Verificación
 
+### Contratos publicados el 20 de noviembre
+
+Para montar las rutas operativas en la app de Codex 01 (`d251a68`):
+
+```python
+from backend.app.accounts.dependencies import get_current_identity
+from backend.app.collections.api import account_actor, router
+from backend.app.collections.service import Collections
+
+app.include_router(router(Collections(transaction), account_actor(get_current_identity, collectives)))
+```
+
+`collectives` relaciona identificadores del catálogo con `huerta` o `reciclaje`. La dependencia traduce roles `resident` y `business` a cliente y exige colectivo conocido para `leader`. La app publicada tiene un bloqueo de importación en Python 3.11: la anotación de `CommunityService.list_appointments` referencia `AppointmentView` antes de su definición.
+
+El gateway de las rutas `/community` es una integración adicional. Debe traducir `organic → organico → huerta`, `recyclable → reciclable → reciclaje` y los estados `recibida/revision/programada/recolectada/cancelada` a `received/under_review/scheduled/collected/cancelled`. Debe proyectar lecturas por dueño, fecha de creación y nombre del responsable. Codex 01 debe transportar la clave de reintento del envío hasta `create_for_user`; la firma publicada solo recibe identidad y comando. Dos entregas intencionales pueden tener idéntico contenido.
+
+En Codex 03 (`2df1b7f`), el esquema necesita representar colectivo, flujo, clave de alta y responsable de turno para materializar las consultas y restricciones del puerto. El adaptador debe resolver el material al UUID de catálogo, preservar el resultado parcial y diferenciar el UUID de solicitud del de entrega. La entrega directa también requiere resolver un responsable de campo. Las funciones publicadas de cierre y entrega directa abren su propia conexión y acreditan puntos. Invocarlas desde `Transaction.credit` abriría una transacción independiente. La integración debe compartir conexión y transacción para cierre, historial, aviso y abono, con un único escritor de cada movimiento.
+
 Desde la raíz, con FastAPI, Pydantic 2 y httpx instalados, ejecutar `python -m unittest discover -s backend/tests/collections -v`. Las pruebas HTTP usan identidades ficticias y un doble con reversión. La concurrencia entre conexiones, los turnos reales, la persistencia de los avisos internos y los movimientos de saldo y stock se verifican después con el adaptador compartido y una base PostgreSQL aislada.

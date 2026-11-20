@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from copy import deepcopy
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 from uuid import uuid4
@@ -7,7 +8,7 @@ from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.app.collections.api import router
+from backend.app.collections.api import account_actor, router
 from backend.app.collections.service import Actor, Collections, Notice
 
 
@@ -137,6 +138,30 @@ class Operations(TestCase):
         self.actor = Actor(uuid4(), "cliente")
         self.assertEqual(self.create().status_code, 403)
         self.assertFalse(self.db.rows)
+
+    def test_account_identity_bridge(self):
+        identity = SimpleNamespace(id=str(self.garden.id), profile=SimpleNamespace(role="leader"),
+                                   collective_id="equipo-huerta")
+        adapt = account_actor(lambda: identity, {"equipo-huerta": "huerta"})
+        app = FastAPI()
+        app.include_router(router(Collections(self.db.transaction), adapt))
+        with TestClient(app) as api:
+            self.assertEqual(api.get(self.base).status_code, 200)
+            identity.collective_id = "desconocido"
+            self.assertEqual(api.get(self.base).status_code, 403)
+            identity.profile.role = "resident"
+            self.assertEqual(api.get(self.base).status_code, 403)
+            self.assertEqual(api.get(self.base + "/avisos").status_code, 200)
+
+    def test_review_state_and_weight_limit(self):
+        path = self.pending()
+        next(iter(self.db.rows.values())).estado = "revision"
+        listing = self.api.get(self.base, params={"estado": "revision"})
+        self.assertEqual(listing.json()[0]["estado"], "revision")
+        self.assertEqual(self.api.post(path + "/programar", json={"cita": "2026-11-21T08:00:00"}).status_code, 200)
+        overweight = dict(self.delivery, kilos="10000.001")
+        self.assertEqual(self.api.post(path + "/cerrar", json=overweight).status_code, 422)
+        self.assertFalse(self.db.credits)
 
     def test_schedule_failed_visit_cancel(self):
         path = self.pending()

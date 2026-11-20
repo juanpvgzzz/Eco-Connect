@@ -8,10 +8,10 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 Flow = Literal["huerta", "reciclaje"]
-State = Literal["recibida", "programada", "recolectada", "cancelada"]
+State = Literal["recibida", "revision", "programada", "recolectada", "cancelada"]
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 Key = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
-Weight = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)]
+Weight = Annotated[Decimal, Field(gt=0, le=10000, max_digits=12, decimal_places=3)]
 BARRANQUILLA = timezone(timedelta(hours=-5))
 
 
@@ -158,7 +158,7 @@ class Collections:
         at = local(data.cita)
         with self.transaction() as tx:
             row = self.find(tx, actor, id)
-            if row.estado not in ("recibida", "programada"):
+            if row.estado not in ("recibida", "revision", "programada"):
                 raise Problem(409, "Solicitud finalizada")
             again = row.estado == "programada"
             if again and not data.motivo:
@@ -175,7 +175,7 @@ class Collections:
     def interrupt(self, actor: Actor, id: UUID, reason: Reason, *, failed: bool):
         with self.transaction() as tx:
             row = self.find(tx, actor, id)
-            if row.estado not in ("recibida", "programada") or (failed and row.estado != "programada"):
+            if row.estado not in ("recibida", "revision", "programada") or (failed and row.estado != "programada"):
                 raise Problem(409, "Estado incompatible con la operación")
             row.estado = "recibida" if failed else "cancelada"
             # El historial conserva el turno de la visita antes de liberar la cita.
