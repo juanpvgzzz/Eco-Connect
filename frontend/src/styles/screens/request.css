@@ -1,0 +1,202 @@
+.wizard,
+.profile {
+  display: grid;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 46rem;
+  margin-inline: auto;
+}
+.wizard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.wizard-title {
+  font-size: var(--fs-h2);
+}
+.wizard .step-title {
+  font-size: var(--fs-h2);
+}
+.step-body {
+  animation: eco-rise var(--t-slow) var(--ease) both;
+}
+.wizard-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-inline: calc(var(--space-4) * -1);
+  margin-bottom: calc(var(--space-4) * -1);
+  padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));
+  background: rgb(255 255 255 / 0.96);
+  border-top: 1px solid var(--border);
+}
+@media (min-width: 768px) {
+  .wizard-actions {
+    position: static;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    justify-content: flex-end;
+  }
+  .wizard-actions > .btn {
+    flex: 0 1 auto;
+    min-width: 12rem;
+  }
+}
+.subpanel {
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+.choice-card.slot .choice-icon {
+  background: var(--eco-leaf-50);
+  color: var(--eco-leaf-text);
+}
+.choice-card.slot:has(input:checked) .choice-check {
+  border-radius: 8px;
+}
+.choice-card .choice-check {
+  align-self: center;
+}
+
+/* Dirección colombiana */
+.address {
+  display: grid;
+  gap: var(--space-4);
+}
+.choice-grid.compact .choice-card {
+  padding: var(--space-3);
+}
+.choice-grid.compact .choice-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.address-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.address-grid.street .area-type,
+.address-grid.street .area-cvalue {
+  grid-column: 1 / -1;
+}
+.address-grid .span-2 {
+  grid-column: 1 / -1;
+}
+@media (min-width: 560px) {
+  .address-grid.street {
+    grid-template-columns: 1.4fr 1fr 1fr;
+  }
+  .address-grid.street .area-type {
+    grid-column: auto;
+  }
+  .address-grid.street .area-cvalue {
+    grid-column: span 2;
+  }
+}
+.address-preview {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--eco-green-100);
+  background: var(--eco-green-50);
+}
+.address-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--eco-forest);
+}
+.address-preview-text {
+  font-weight: 600;
+  font-size: 1.0625rem;
+  color: var(--eco-forest);
+  overflow-wrap: anywhere;
+}
+
+.step-lead {
+  margin-top: calc(var(--space-3) * -1);
+}
+
+/* Lista vertical de materiales: icono · nombre · casilla. La selección se
+   indica con borde, fondo y marca de verificación, no solo con color. */
+.option-legend {
+  margin-bottom: var(--space-2);
+}
+.option-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.option-list li + li {
+  border-top: 1px solid var(--border);
+}
+.option-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  transition: background-color var(--t) var(--ease), box-shadow var(--t) var(--ease);
+}
+.option-row:hover {
+  background: var(--surface-muted);
+}
+.option-row input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+}
+.option-row:has(input:checked) {
+  background: var(--eco-green-50);
+  box-shadow: inset 4px 0 0 var(--eco-green);
+}
+.option-row:has(input:focus-visible) {
+  box-shadow: inset 0 0 0 3px var(--eco-teal-text);
+}
+.option-icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  border-radius: 10px;
+  background: var(--eco-leaf-50);
+  color: var(--eco-leaf-text);
+}
+.option-row[data-tone="recycle"] .option-icon {
+  background: var(--eco-teal-50);
+  color: #05543f;
+}
+.option-name {
+  flex: 1;
+  font-weight: 500;
+}
+.option-check {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  border: 2px solid var(--border-strong);
+  border-radius: 6px;
+  color: transparent;
+  transition: all var(--t) var(--ease);
+}
+.option-row:has(input:checked) .option-check {
+  border-color: var(--eco-green-action);
+  background: var(--eco-green-action);
+  color: var(--eco-white);
+}

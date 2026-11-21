@@ -1,0 +1,49 @@
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.view {
+  display: grid;
+  gap: var(--space-4);
+  padding-block: var(--space-4) var(--space-6);
+}
+.view > * { min-width: 0; }
+@media (min-width: 768px) {
+  .view {
+    gap: var(--space-5);
+    padding-block: var(--space-5) var(--space-6);
+  }
+}
+.eyebrow {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--eco-green-text);
+}
+
+/* Acerca de EcoConecta: logos aliados originales, una sola vez y sin destacar */
+.about-partners {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+.about-title {
+  font-size: var(--fs-h3);
+}
+.about-logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+}
+.about-logos img {
+  width: auto;
+  height: 44px;
+}

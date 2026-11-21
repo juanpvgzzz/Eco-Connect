@@ -12,6 +12,7 @@ class AccountRole(StrEnum):
     RESIDENT = "resident"
     BUSINESS = "business"
     LEADER = "leader"
+    FIELD_WORKER = "field_worker"
     ADMIN = "admin"
 
 
@@ -31,6 +32,8 @@ class AccountIdentity:
     id: str
     profile: AccountProfile
     collective_id: str | None = None
+    worker_id: str | None = None
+    collective_flow: str | None = None
 
 
 @dataclass(slots=True)
@@ -45,6 +48,8 @@ class AccountRecord:
     role: AccountRole
     pilot_enabled: bool = False
     collective_id: str | None = None
+    worker_id: str | None = None
+    collective_flow: str | None = None
 
     def identity(self) -> AccountIdentity:
         return AccountIdentity(
@@ -59,7 +64,35 @@ class AccountRecord:
                 pilot_enabled=self.pilot_enabled,
             ),
             collective_id=self.collective_id,
+            worker_id=self.worker_id,
+            collective_flow=self.collective_flow,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class AdminAccountSummary:
+    id: str
+    national_id: str
+    full_name: str
+    kind: AccountKind
+    role: AccountRole
+    pilot_enabled: bool
+    collective_id: str | None
+    collective_flow: str | None
+    worker_id: str | None
+    active: bool
+
+
+@dataclass(frozen=True, slots=True)
+class AdminPointRule:
+    id: str
+    material_code: str
+    material_name: str
+    points_per_kg: str
+    valid_from: datetime
+    valid_until: datetime | None
+    provisional: bool = True
+    note: str | None = None
 
 
 @dataclass(slots=True)

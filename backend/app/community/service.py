@@ -2,19 +2,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from backend.app.accounts.models import AccountIdentity
+from backend.app.accounts.models import AccountIdentity, AccountRole
+from backend.app.accounts.service import ForbiddenAction
 from backend.app.errors import InvalidInput
 from backend.app.community.models import (
     CollectionStatus,
     CollectionRecord,
     CreateCollectionCommand,
     NotificationRecord,
+    ParticipationRecord,
     PointsMovementRecord,
     PointsRecord,
     RedemptionRecord,
     RewardRecord,
+    RewardSettings,
 )
 from backend.app.community.ports import (
     BusinessNotEnabled,
@@ -93,6 +97,13 @@ class CommunityService:
             raise CommunityNotFound
         return self._owned(item, actor.id)
 
+    def collection_history(self, *, actor: AccountIdentity, request_id: str) -> list[dict]:
+        """Historial de una solicitud propia: estados, cita, resultado y puntos."""
+        events = self._collections().history_for_user(actor.id, request_id)
+        if events is None:
+            raise CommunityNotFound
+        return events
+
     def list_notifications(self, *, actor: AccountIdentity) -> list[NotificationRecord]:
         return [
             item
@@ -120,11 +131,26 @@ class CommunityService:
             if item.owner_id == actor.id
         ]
 
+    def participation(self, *, actor: AccountIdentity) -> ParticipationRecord:
+        return self._points().get_participation_for_user(actor.id)
+
     def rewards(self) -> list[RewardRecord]:
         rewards = self._points().list_rewards()
         if any(reward.cost < 0 for reward in rewards):
             raise IntegrationContractError
         return rewards
+
+    def reward_settings(self, *, actor: AccountIdentity) -> list[dict]:
+        if actor.profile.role != AccountRole.ADMIN:
+            raise ForbiddenAction
+        return self._points().list_reward_settings()
+
+    def configure_reward(
+        self, *, actor: AccountIdentity, reward_id: UUID | None, settings: RewardSettings,
+    ) -> dict:
+        if actor.profile.role != AccountRole.ADMIN:
+            raise ForbiddenAction
+        return self._points().save_reward_settings(actor.id, reward_id, settings)
 
     def request_redemption(
         self, *, actor: AccountIdentity, reward_id: str

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Protocol
 
-from backend.app.accounts.models import AccountRecord, AccountRole, SessionRecord
+from backend.app.accounts.models import AccountRecord, AccountRole, AdminAccountSummary, AdminPointRule, SessionRecord
 
 
 class DuplicateNationalId(Exception):
@@ -23,6 +23,27 @@ class AccountStore(Protocol):
         role: AccountRole,
         pilot_enabled: bool,
         collective_id: str | None,
+        actor_id: str | None = None,
+        worker_id: str | None = None,
+    ) -> AccountRecord | None: ...
+
+    def list_accounts(
+        self, search: str | None, role: AccountRole | None, limit: int = 50, offset: int = 0,
+    ) -> list[AdminAccountSummary]: ...
+
+    def list_collectives(self) -> list[dict[str, str]]: ...
+
+    def list_point_rules(self) -> list[AdminPointRule]: ...
+
+    def list_collective_members(self, collective_id: str) -> list[dict] | None: ...
+
+    def create_point_rule(self, code: str, name: str, points_per_kg, note: str | None,
+                          actor_id: str) -> AdminPointRule: ...
+
+    def collection_report(self, start: datetime, end: datetime) -> dict: ...
+
+    def set_account_active(
+        self, account_id: str, active: bool, actor_id: str | None = None,
     ) -> AccountRecord | None: ...
 
     def is_login_locked(self, attempt_key: str, now: datetime) -> bool: ...

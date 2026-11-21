@@ -1,0 +1,208 @@
+/* Mensajes en línea: siempre color + icono + texto */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  animation: eco-rise var(--t-slow) var(--ease) both;
+}
+.alert svg {
+  flex: none;
+  margin-top: 1px;
+}
+.alert-body {
+  display: grid;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+.alert-title {
+  font-weight: 700;
+}
+.alert-error {
+  background: var(--eco-danger-50);
+  border-color: var(--eco-danger);
+  color: #7a1a14;
+}
+.alert-success {
+  background: var(--eco-green-50);
+  border-color: var(--eco-green);
+  color: var(--eco-green-text);
+}
+.alert-info {
+  background: var(--eco-teal-50);
+  border-color: var(--eco-teal);
+  color: #05543f;
+}
+.alert-warning {
+  background: var(--eco-yellow-50);
+  border-color: var(--eco-yellow);
+  color: var(--eco-yellow-text);
+}
+.alert-close {
+  margin: -0.5rem -0.5rem -0.5rem 0;
+  min-height: 40px;
+  min-width: 40px;
+  color: inherit;
+}
+
+/* Insignia de estado */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.badge[data-tone="pending"] {
+  background: var(--neutral-50);
+  border-color: #c5ccc7;
+  color: var(--eco-charcoal);
+}
+.badge[data-tone="review"] {
+  background: var(--eco-teal-50);
+  border-color: #8fd3bd;
+  color: #05543f;
+}
+.badge[data-tone="scheduled"] {
+  background: var(--eco-green-50);
+  border-color: #9fcfa9;
+  color: var(--eco-forest);
+}
+.badge[data-tone="done"] {
+  background: var(--eco-leaf-50);
+  border-color: #bcd98f;
+  color: var(--eco-leaf-text);
+}
+.badge[data-tone="cancelled"] {
+  background: var(--surface);
+  border-color: #c5ccc7;
+  border-style: dashed;
+  color: #4a524d;
+}
+.badge[data-tone="organic"] {
+  background: var(--eco-leaf-50);
+  border-color: #bcd98f;
+  color: var(--eco-leaf-text);
+}
+.badge[data-tone="recycle"] {
+  background: var(--eco-teal-50);
+  border-color: #8fd3bd;
+  color: #05543f;
+}
+.badge[data-tone="points"] {
+  background: var(--eco-yellow);
+  color: var(--eco-charcoal);
+}
+.badge[data-tone="new"] {
+  background: var(--eco-orange);
+  color: var(--eco-charcoal);
+}
+
+/* Indicador de carga */
+.spinner {
+  display: inline-block;
+  width: 1.125em;
+  height: 1.125em;
+  border: 2.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: eco-spin 700ms linear infinite;
+  flex: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: eco-spin 1.6s linear infinite !important;
+  }
+}
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.skeleton {
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #e9eee9, #f4f7f4, #e9eee9);
+  background-size: 200% 100%;
+  min-height: 5.5rem;
+}
+
+/* Estado vacío compacto */
+.empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  border-radius: 14px;
+  background: var(--eco-leaf-50);
+  color: var(--eco-forest);
+}
+.empty-body {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+.empty-body h3 {
+  font-size: 1rem;
+}
+.empty-body p {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+
+/* Notificaciones temporales */
+.toast-region {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: grid;
+  gap: var(--space-2);
+  width: min(28rem, calc(100% - 2rem));
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--eco-forest);
+  color: var(--eco-white);
+  box-shadow: var(--shadow);
+  font-weight: 600;
+  pointer-events: auto;
+  animation: eco-rise var(--t-slow) var(--ease) both;
+}
+.toast[data-tone="error"] {
+  background: var(--eco-danger);
+}
+.toast .btn {
+  margin-left: auto;
+  min-height: 40px;
+  color: inherit;
+}

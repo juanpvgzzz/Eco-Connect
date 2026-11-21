@@ -56,9 +56,12 @@ class PersistenceTests(unittest.TestCase):
                          (self.material, str(self.material)))
             conn.execute("""insert into point_rules (material_id,points_per_kg,valid_from)
                 values (%s,10,'2020-01-01T00:00:00Z')""", (self.material,))
-            conn.execute("""insert into rewards (id,pilot_id,code,name,points_cost,stock)
-                values (%s,%s,%s,'Premio ficticio',20,2)""",
-                (self.reward, self.pilot, str(self.reward)))
+            admin = conn.execute("""insert into users (pilot_id,email,full_name,role,password_hash)
+                values (%s,%s,'Administración ficticia','admin','TEST_ONLY') returning id""",
+                (self.pilot, f"admin-{self.pilot}@example.invalid")).fetchone()[0]
+            conn.execute("""insert into rewards (id,pilot_id,code,name,points_cost,stock,validated_at,validated_by)
+                values (%s,%s,%s,'Premio ficticio',20,2,now(),%s)""",
+                (self.reward, self.pilot, str(self.reward), admin))
             conn.execute("""insert into pickup_requests
                 (id,client_id,pilot_id,address,status)
                 values (%s,%s,%s,'Dirección ficticia','programada')""",
@@ -82,7 +85,7 @@ class PersistenceTests(unittest.TestCase):
 
     def test_migrations_clean_and_repeatable(self):
         from db.migrate import migrate
-        self.assertEqual(self.applied, ["001_initial.sql", "002_api_integration.sql"])
+        self.assertEqual(self.applied, ["001_initial.sql", "002_api_integration.sql", "003_account_roles_and_audit.sql", "004_point_rule_configuration.sql", "005_household_pilot_enablement.sql", "006_participation_rewards.sql"])
         self.assertEqual(self.applied_again, [])
         self.assertEqual(migrate(self.url), [])
         with self.psycopg.connect(self.url) as conn:
@@ -94,6 +97,7 @@ class PersistenceTests(unittest.TestCase):
         from psycopg.conninfo import make_conninfo
 
         from db.migrate import MIGRATIONS, migrate
+        from db.operations import close_pickup
 
         base = os.environ["TEST_DATABASE_URL"]
         namespace = f"ec_upgrade_{uuid4().hex}"
@@ -112,7 +116,17 @@ class PersistenceTests(unittest.TestCase):
         initial_demo = demo.split("-- Pilot catalog and a fictional shift")[0]
         with self.psycopg.connect(url, autocommit=True) as conn:
             conn.execute(initial_demo)
-        self.assertEqual(migrate(url), ["002_api_integration.sql"])
+            request, leader, worker = conn.execute("""
+                select a.request_id, a.leader_id, w.id
+                from pickup_appointments a join field_workers w on w.pilot_id = a.pilot_id
+            """).fetchone()
+            material = conn.execute("select id from materials where code = 'PET'").fetchone()[0]
+        self.assertEqual(close_pickup(url, request, leader, worker,
+                                     [{"material_id": str(material), "weight_kg": "2"}])[1], 20)
+        self.assertEqual(migrate(url), [
+            "002_api_integration.sql", "003_account_roles_and_audit.sql", "004_point_rule_configuration.sql",
+            "005_household_pilot_enablement.sql", "006_participation_rewards.sql",
+        ])
         self.assertEqual(migrate(url), [])
         with self.psycopg.connect(url) as conn:
             row = conn.execute("""
@@ -121,7 +135,17 @@ class PersistenceTests(unittest.TestCase):
                 join pickup_appointments a on a.request_id = p.id
                 join pickup_slots s on s.id = a.slot_id
             """).fetchone()
-            self.assertEqual(row, ("programada", "Cita de prueba creada.", True))
+            self.assertEqual(row, ("recolectada", "Cita de prueba creada.", True))
+            # RN-08: los hogares existentes antes de 005 conservan su acceso al piloto.
+            self.assertEqual(conn.execute("""
+                select kind, pilot_enabled from users where role = 'cliente'
+            """).fetchall(), [("household", True)])
+            self.assertEqual(conn.execute("""
+                select u.points_balance, p.pickups, p.unlocked_at = m.created_at
+                from users u join participation_recognitions p on p.client_id = u.id
+                join point_movements m on m.client_id = u.id
+            """).fetchall(), [(20, 1, True)])
+            self.assertEqual(conn.execute("select validated_at from rewards").fetchall(), [(None,)])
 
     def _drop_schema(self, base, schema):
         from psycopg import sql

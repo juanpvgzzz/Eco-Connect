@@ -41,6 +41,11 @@ class CollectionRecord:
     address: str
     created_at: datetime
     appointment: AppointmentRecord | None = None
+    # Datos reales del formulario para que el vecino vea su propia solicitud.
+    flow: WasteFlow | None = None
+    material: str | None = None
+    availability: str | None = None
+    notes: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +55,7 @@ class NotificationRecord:
     title: str
     message: str
     created_at: datetime
+    scheduled_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,11 +74,35 @@ class PointsMovementRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class ParticipationMilestone:
+    pickups: int
+    title: str
+    unlocked_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class ParticipationRecord:
+    completed: int
+    milestones: list[ParticipationMilestone]
+
+
+@dataclass(frozen=True, slots=True)
 class RewardRecord:
     id: str
     title: str
     description: str
     cost: int
+    stock: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class RewardSettings:
+    title: str
+    description: str
+    cost: int
+    stock: int | None
+    active: bool
+    validated: bool
 
 
 @dataclass(frozen=True, slots=True)

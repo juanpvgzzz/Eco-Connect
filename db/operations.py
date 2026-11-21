@@ -1,5 +1,6 @@
 """Atomic persistence operations; API routers translate DomainError to HTTP responses."""
 
+from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_DOWN
 from uuid import UUID
 
@@ -44,8 +45,17 @@ def _authorized_close(conn, actor_id: UUID, field_worker_id: UUID, pilot_id: UUI
         "select role, active from users where id = %s and pilot_id = %s",
         (actor_id, pilot_id),
     ).fetchone()
-    if not actor or actor["role"] != "lider" or not actor["active"]:
-        raise DomainError("active pilot leader required")
+    if not actor or not actor["active"]:
+        raise DomainError("active pilot leader or assigned field worker required")
+    if actor["role"] == "recolector":
+        # Un recolector solo cierra la recogida asignada al integrante vinculado a su cuenta.
+        own = conn.execute("""
+            select 1 from field_workers where id = %s and account_id = %s and pilot_id = %s and active
+        """, (field_worker_id, actor_id, pilot_id)).fetchone()
+        if own is None:
+            raise DomainError("field worker can only close their own assigned collection")
+    elif actor["role"] != "lider":
+        raise DomainError("active pilot leader or assigned field worker required")
     worker = conn.execute(
         "select active from field_workers where id = %s and pilot_id = %s",
         (field_worker_id, pilot_id),
@@ -178,7 +188,7 @@ def confirm_redemption(database_url: str, client_id: str | UUID,
 
 
 def confirm_redemption_in_transaction(
-    conn, client_id: UUID, reward_id: UUID, code: str,
+    conn, client_id: UUID, reward_id: UUID, code: str, *, validated_at: datetime | None = None,
 ) -> tuple[UUID, int]:
     """Confirm a redemption inside the caller's transaction."""
     client = conn.execute("""
@@ -195,11 +205,13 @@ def confirm_redemption_in_transaction(
             raise DomainError("code already used")
         return existing["id"], existing["points_cost"]
     reward = conn.execute("""
-        select points_cost, stock, active from rewards
+        select points_cost, stock, active, validated_at from rewards
         where id = %s and pilot_id = %s for update
     """, (reward_id, client["pilot_id"])).fetchone()
-    if not reward or not reward["active"] or reward["stock"] < 1:
+    if not reward or not reward["active"] or reward["stock"] < 1 or reward["validated_at"] is None:
         raise DomainError("reward unavailable")
+    if validated_at is not None and reward["validated_at"] != validated_at:
+        raise DomainError("Las condiciones del premio cambiaron. Solicita otro código.")
     if client["points_balance"] < reward["points_cost"]:
         raise DomainError("insufficient points")
     redemption_id = conn.execute("""

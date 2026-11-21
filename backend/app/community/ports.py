@@ -1,14 +1,17 @@
 from typing import Protocol
+from uuid import UUID
 
 from backend.app.accounts.models import AccountIdentity
 from backend.app.community.models import (
     CollectionRecord,
     CreateCollectionCommand,
     NotificationRecord,
+    ParticipationRecord,
     PointsMovementRecord,
     PointsRecord,
     RedemptionRecord,
     RewardRecord,
+    RewardSettings,
 )
 
 
@@ -38,6 +41,8 @@ class CommunityCollectionsGateway(Protocol):
 
     def list_appointments_for_user(self, owner_id: str) -> list[CollectionRecord]: ...
 
+    def history_for_user(self, owner_id: str, request_id: str) -> list[dict] | None: ...
+
 
 class CommunityPointsGateway(Protocol):
     """Read and code-request contract for Codex 3; it intentionally has no debit call."""
@@ -46,6 +51,12 @@ class CommunityPointsGateway(Protocol):
 
     def list_movements_for_user(self, owner_id: str) -> list[PointsMovementRecord]: ...
 
+    def get_participation_for_user(self, owner_id: str) -> ParticipationRecord: ...
+
     def list_rewards(self) -> list[RewardRecord]: ...
+
+    def list_reward_settings(self) -> list[dict]: ...
+
+    def save_reward_settings(self, actor_id: str, reward_id: UUID | None, settings: RewardSettings) -> dict: ...
 
     def request_code_for_user(self, owner_id: str, reward_id: str) -> RedemptionRecord: ...

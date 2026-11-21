@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from backend.app.accounts.models import AccountKind, AccountRole
+from backend.app.accounts.models import AccountKind, AccountRole, AdminAccountSummary
 from backend.app.accounts.ports import DuplicateNationalId
 from backend.app.errors import InvalidInput
 from backend.app.accounts.service import (
@@ -34,12 +34,37 @@ class MemoryAccountStore:
         self.accounts[account.national_id] = account
         return account
 
-    def set_authorization(self, account_id, role, pilot_enabled, collective_id):
+    def set_authorization(self, account_id, role, pilot_enabled, collective_id, actor_id=None, worker_id=None):
         account = next(item for item in self.accounts.values() if item.id == account_id)
         account.role = role
         account.pilot_enabled = pilot_enabled
         account.collective_id = collective_id
         return account
+
+    def list_accounts(self, search=None, role=None, limit=50, offset=0):
+        result = []
+        for account in self.accounts.values():
+            if role is not None and account.role is not role:
+                continue
+            if search and search.lower() not in account.full_name.lower() and search not in account.national_id:
+                continue
+            result.append(AdminAccountSummary(
+                id=account.id, national_id=account.national_id, full_name=account.full_name,
+                kind=account.kind, role=account.role,
+                pilot_enabled=account.pilot_enabled, collective_id=account.collective_id,
+                collective_flow=None, worker_id=account.worker_id, active=True,
+            ))
+        return result[offset:offset + limit]
+
+    def list_collectives(self):
+        return []
+
+    def list_point_rules(self):
+        return []
+
+    def collection_report(self, start, end):
+        return {"solicitudes": {}, "recogidas_completadas": 0, "puntos_acreditados": 0,
+                "desde": start, "hasta": end}
 
     def is_login_locked(self, national_id, now):
         return self.locked_until.get(national_id, now) > now
@@ -94,6 +119,50 @@ def test_register_normalizes_document_and_never_grants_privileges(service_and_st
     assert saved.pin_hash != "1234"
 
 
+@pytest.mark.parametrize("phone", ["+57 300 123 4567", "300-123-4567", "(300) 1234567", "573001234567", "6053456789"])
+def test_register_normalizes_colombian_phone(service_and_store, phone):
+    service, store = service_and_store
+
+    service.register(
+        national_id="555", full_name="  Ana   María  Núñez ", address=" Manzana 12,  Casa 8 ",
+        phone=phone, kind=AccountKind.HOUSEHOLD, pin="1234",
+    )
+
+    saved = store.find_by_national_id("555")
+    assert saved.phone == phone.replace("+57", "").replace(" ", "").replace("-", "").replace("(", "").replace(")", "")[-10:]
+    assert saved.full_name == "Ana María Núñez"
+    assert saved.address == "Manzana 12, Casa 8"
+
+
+@pytest.mark.parametrize("name", ["A", "Ana 123", "Ana_Elena"])
+def test_register_rejects_invalid_name(service_and_store, name):
+    service, store = service_and_store
+    with pytest.raises(InvalidInput):
+        service.register(national_id="557", full_name=name, address="Calle 1",
+                         phone="3001234567", kind=AccountKind.HOUSEHOLD, pin="1234")
+    assert store.find_by_national_id("557") is None
+
+
+def test_register_rejects_short_address(service_and_store):
+    service, store = service_and_store
+    with pytest.raises(InvalidInput):
+        service.register(national_id="558", full_name="Ana Pérez", address="A",
+                         phone="3001234567", kind=AccountKind.HOUSEHOLD, pin="1234")
+    assert store.find_by_national_id("558") is None
+
+
+@pytest.mark.parametrize("phone", ["12345", "2001234567", "30012345678", "300abc4567", "+1 300 123 4567"])
+def test_register_rejects_invalid_colombian_phone(service_and_store, phone):
+    service, store = service_and_store
+
+    with pytest.raises(InvalidInput):
+        service.register(
+            national_id="556", full_name="Ana", address="Calle 1", phone=phone,
+            kind=AccountKind.HOUSEHOLD, pin="1234",
+        )
+    assert store.find_by_national_id("556") is None
+
+
 def test_duplicate_registration_is_controlled(service_and_store):
     service, _ = service_and_store
     values = dict(
@@ -108,6 +177,23 @@ def test_duplicate_registration_is_controlled(service_and_store):
 
     with pytest.raises(AccountAlreadyExists):
         service.register(**values)
+
+
+def test_admin_directory_is_server_authorized(service_and_store):
+    service, store = service_and_store
+    resident = service.register(
+        national_id="123456789", full_name="María Pérez", address="Calle 1",
+        phone="3001234567", kind=AccountKind.HOUSEHOLD, pin="1234",
+    )
+    with pytest.raises(ForbiddenAction):
+        service.admin_accounts(actor=resident)
+
+    account = store.find_by_id(resident.id)
+    account.role = AccountRole.ADMIN
+    admin = account.identity()
+    listed = service.admin_accounts(actor=admin, search="María")
+    assert len(listed) == 1
+    assert listed[0].role is AccountRole.ADMIN
 
 
 def test_unknown_and_wrong_credentials_have_same_error(service_and_store):

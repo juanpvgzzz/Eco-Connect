@@ -3,7 +3,10 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from backend.app.accounts.dependencies import get_current_identity
 from backend.app.accounts.models import AccountIdentity
@@ -81,6 +84,12 @@ def create_app(
     async def collection_error_handler(request: Request, exc: Problem) -> JSONResponse:
         return JSONResponse(status_code=exc.status, content={"detail": str(exc)})
 
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        # Pydantic's input can include submitted PINs or entire request bodies.
+        errors = [{key: error[key] for key in ("loc", "msg", "type")} for error in exc.errors()]
+        return JSONResponse(status_code=422, content={"detail": errors})
+
     @app.exception_handler(AccountError)
     async def account_error_handler(request: Request, exc: AccountError) -> JSONResponse:
         if isinstance(exc, AccountAlreadyExists):
@@ -127,6 +136,11 @@ def create_app(
         else:
             status_code, detail = 400, "Community request could not be completed"
         return JSONResponse(status_code=status_code, content={"detail": detail})
+
+    # The production image serves the compiled React app from this same service.
+    frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+    if frontend_dist.is_dir():
+        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
     return app
 

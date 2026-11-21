@@ -1,0 +1,74 @@
+/* Acceso y registro comparten una columna, con espacio para los pasos del registro. */
+.auth {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-6);
+}
+.auth-identity {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  padding-block: var(--space-2);
+}
+.auth-identity .brand img {
+  width: clamp(220px, 42vw, 255px);
+}
+.auth-panel {
+  width: min(100%, 29rem);
+  min-width: 0;
+  padding: clamp(1.125rem, 4vw, 2rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.auth-panel[data-wide] {
+  width: min(100%, 40rem);
+}
+@media (min-width: 768px) {
+  .auth {
+    padding-top: var(--space-6);
+    gap: var(--space-5);
+  }
+}
+.auth-form {
+  display: grid;
+  gap: var(--space-4);
+}
+.auth-heading {
+  display: grid;
+  gap: var(--space-2);
+}
+.auth-secondary {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+.auth-demo {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border);
+}
+.auth-demo h2 {
+  font-size: var(--fs-small);
+}
+.step-title {
+  font-size: var(--fs-h3);
+  outline: none;
+}
+.group-title {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--eco-green-text);
+  font-family: var(--font-body);
+  letter-spacing: 0.02em;
+}
+.group-title:not(:first-child) {
+  margin-top: var(--space-2);
+}

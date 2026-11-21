@@ -8,7 +8,7 @@ from uuid import UUID
 from psycopg.errors import UniqueViolation
 from psycopg.types.json import Jsonb
 
-from backend.app.collections.service import Actor, Flow, Notice, Problem, Record, State
+from backend.app.collections.service import Actor, CalendarItem, Flow, InboxRecord, Notice, Problem, Record, State
 from db.connection import open_connection
 from db.operations import DomainError, _authorized_close, _credit_items, confirm_redemption_in_transaction
 
@@ -28,12 +28,14 @@ PICKUPS = """
 
 EVENT_TITLES = {
     "recibida": "Solicitud recibida",
+    "revision": "Solicitud en revisión",
     "programada": "Recolección programada",
     "reprogramada": "Recolección reprogramada",
     "visita_fallida": "Visita fallida. Se requiere una nueva cita",
     "cancelada": "Recolección cancelada",
     "recolectada": "Recolección completada",
     "entrega_directa": "Entrega directa registrada",
+    "aviso_recolector": "Aviso al recolector registrado",
 }
 
 
@@ -43,6 +45,11 @@ def _pickup(row):
         solicitud=row["form"], cita=row["scheduled_at"], responsable=row["responsible_id"],
         programada_por=row["leader_id"], entrega=row["api_result"], cerrada_por=row["closed_by_id"],
     )
+
+
+def _calendar(row):
+    return CalendarItem(**_pickup(row).model_dump(), nombre_responsable=row["responsible_name"],
+                        creada=row["created_at"])
 
 
 def _direct(row):
@@ -75,6 +82,18 @@ class PostgresCollections:
         if identity.profile.role in ("resident", "business"):
             generator = "unidad_productiva" if identity.profile.kind == "business" else "hogar"
             return Actor(account_id, "cliente", generador=generator)
+        if identity.profile.role == "admin":
+            return Actor(account_id, "admin")
+        if identity.profile.role == "field_worker" and identity.worker_id and identity.collective_id:
+            # Vínculo verificado en PostgreSQL: integrante activo, de su colectivo y con esta cuenta.
+            with open_connection(self.url) as conn:
+                row = conn.execute("""
+                    select c.flow, w.id as worker_id from field_workers w
+                    join collectives c on c.id = w.collective_id and c.pilot_id = w.pilot_id
+                    where w.id = %s and w.account_id = %s and w.pilot_id = %s and w.active and c.id = %s
+                """, (identity.worker_id, account_id, self.pilot_id, identity.collective_id)).fetchone()
+            if row:
+                return Actor(account_id, "recolector", row["flow"], trabajador_id=row["worker_id"])
         if identity.profile.role == "leader" and identity.collective_id:
             with open_connection(self.url) as conn:
                 row = conn.execute("""
@@ -96,7 +115,7 @@ class CollectionTransaction:
         return self.conn.execute("""
             select 1 from users u join pilots p on p.id = u.pilot_id
             where u.id = %s and p.id = %s and p.active and u.active and u.role = 'cliente'
-              and (u.kind = 'household' or u.pilot_enabled)
+              and u.pilot_enabled  -- RN-08: hogares y unidades productivas habilitados por administración
         """, (client, self.pilot_id)).fetchone() is not None
 
     def reserve(self, scope: str, owner: UUID, key: str, new: Record) -> tuple[Record, bool]:
@@ -139,6 +158,50 @@ class CollectionTransaction:
         """, (id, self.pilot_id, flow)).fetchone()
         return _direct(direct) if direct else None
 
+    def workers(self, flow: Flow, include_inactive: bool = False) -> list[dict]:
+        return self.conn.execute("""
+            select w.id, w.full_name, w.active from field_workers w
+            join collectives c on c.id = w.collective_id and c.pilot_id = w.pilot_id
+            where w.pilot_id = %s and c.flow = %s and (w.active or %s)
+            order by w.active desc, w.full_name, w.id
+        """, (self.pilot_id, flow, include_inactive)).fetchall()
+
+    def add_worker(self, flow: Flow, name: str) -> dict:
+        # Registro operativo sin cuenta de usuario (account_id queda nulo).
+        row = self.conn.execute("""
+            insert into field_workers (pilot_id, full_name, collective_id)
+            select %s, %s, c.id from collectives c where c.pilot_id = %s and c.flow = %s
+            returning id, full_name, active
+        """, (self.pilot_id, name, self.pilot_id, flow)).fetchone()
+        if row is None:
+            raise Problem(409, "El colectivo no está configurado")
+        return row
+
+    def set_worker_active(self, flow: Flow, worker: UUID, active: bool) -> dict | None:
+        return self.conn.execute("""
+            update field_workers w set active = %s from collectives c
+            where w.id = %s and w.pilot_id = %s and c.id = w.collective_id
+              and c.pilot_id = w.pilot_id and c.flow = %s
+            returning w.id, w.full_name, w.active
+        """, (active, worker, self.pilot_id, flow)).fetchone()
+
+    def materials(self) -> list[dict]:
+        return self.conn.execute("""
+            select distinct m.code, m.name from materials m
+            join point_rules r on r.material_id = m.id
+            where m.active and r.valid_from <= now()
+              and (r.valid_until is null or r.valid_until > now())
+            order by m.name, m.code
+        """).fetchall()
+
+    def worker_in_flow(self, flow: Flow, worker: UUID) -> bool:
+        return self.conn.execute("""
+            select 1 from field_workers w
+            join collectives c on c.id = w.collective_id and c.pilot_id = w.pilot_id
+            where w.id = %s and w.pilot_id = %s and c.flow = %s and w.active
+            for update of w
+        """, (worker, self.pilot_id, flow)).fetchone() is not None
+
     def save(self, row: Record) -> None:
         if row.entrega:
             self.pending = row
@@ -157,10 +220,24 @@ class CollectionTransaction:
             select %s, id, %s, %s::timestamptz + interval '1 hour'
             from collectives where pilot_id = %s and flow = %s
             on conflict (pilot_id, collective_id, starts_at)
-            do update set starts_at = excluded.starts_at returning id, active
+            do update set starts_at = excluded.starts_at returning id, active, ends_at
         """, (self.pilot_id, row.cita, row.cita, self.pilot_id, row.flujo)).fetchone()
         if not slot or not slot["active"]:
             raise Problem(409, "Horario no disponible")
+        # schedule() mantiene bloqueada la fila del recolector durante la comprobación
+        # y la escritura. Los límites abiertos permiten citas contiguas.
+        conflict = self.conn.execute("""
+            select 1
+            from pickup_appointments a
+            join pickup_slots s on s.id = a.slot_id and s.pilot_id = a.pilot_id
+            join pickup_requests p on p.id = a.request_id and p.pilot_id = a.pilot_id
+            where a.pilot_id = %s and a.worker_id = %s
+              and a.request_id <> %s and p.status = 'programada'
+              and s.starts_at < %s and s.ends_at > %s
+            limit 1
+        """, (self.pilot_id, row.responsable, row.id, slot["ends_at"], row.cita)).fetchone()
+        if conflict:
+            raise Problem(409, "El recolector ya tiene una recogida en ese intervalo")
         try:
             self.conn.execute("""
                 insert into pickup_appointments (request_id, pilot_id, slot_id, leader_id, worker_id)
@@ -180,6 +257,7 @@ class CollectionTransaction:
             join collectives c on c.id = s.collective_id
             join field_workers w on w.id = s.worker_id
             where c.pilot_id = %s and c.flow = %s and w.active
+              and (w.collective_id is null or w.collective_id = c.id)
               and s.starts_at <= %s and s.ends_at > %s
             order by s.starts_at desc, s.id limit 1
         """, (self.pilot_id, flow, at, at)).fetchone()
@@ -194,6 +272,12 @@ class CollectionTransaction:
             ).fetchone()
             if person:
                 snapshot["nombre_responsable"] = person["full_name"]
+        if row.entrega and getattr(row.entrega, "recolector", None):
+            person = self.conn.execute(
+                "select full_name from field_workers where id = %s", (row.entrega.recolector,)
+            ).fetchone()
+            if person:
+                snapshot["nombre_recolector"] = person["full_name"]
         self.conn.execute("""
             insert into collection_events
                 (pilot_id, request_id, delivery_id, client_id, flow, author_id, kind, snapshot, reason)
@@ -204,7 +288,8 @@ class CollectionTransaction:
     def credit(self, delivery_id: UUID, client: UUID, material: str, kilos: Decimal) -> None:
         row = self.pending
         direct = self.direct_key is not None
-        worker = self.on_duty(row.flujo, datetime.now(timezone.utc)) if direct else row.responsable
+        # Recogida: quien hizo el trabajo según la coordinadora (por defecto, el asignado).
+        worker = self.on_duty(row.flujo, datetime.now(timezone.utc)) if direct else (row.entrega.recolector or row.responsable)
         if worker is None:
             raise Problem(409, "Sin responsable de turno para la entrega")
         item = self.conn.execute("""
@@ -233,7 +318,47 @@ class CollectionTransaction:
             where p.pilot_id = %s and p.flow = %s and (%s::text is null or p.status = %s)
             order by p.created_at, p.id
         """, (self.pilot_id, flow, state, state)).fetchall()
-        return [_pickup(row) for row in rows]
+        return [
+            InboxRecord(**_pickup(row).model_dump(), nombre_responsable=row["responsible_name"])
+            for row in rows
+        ]
+
+    def locked_assigned(self, worker: UUID, flow: Flow, id: UUID) -> Record | None:
+        row = self.conn.execute("""
+            select p.id from pickup_requests p
+            join pickup_appointments a on a.request_id = p.id and a.pilot_id = p.pilot_id
+            where p.id = %s and p.pilot_id = %s and p.flow = %s
+              and a.worker_id = %s and p.status in ('programada', 'recolectada')
+            for update of p
+        """, (id, self.pilot_id, flow, worker)).fetchone()
+        if not row:
+            return None
+        return _pickup(self.conn.execute(PICKUPS + " where p.id = %s", (id,)).fetchone())
+
+    def assigned(self, worker: UUID, flow: Flow) -> list[Record]:
+        rows = self.conn.execute(PICKUPS + """
+            where p.pilot_id = %s and p.flow = %s and a.worker_id = %s
+              and p.status in ('programada', 'recolectada')
+            order by s.starts_at nulls last, p.id
+        """, (self.pilot_id, flow, worker)).fetchall()
+        return [InboxRecord(**_pickup(row).model_dump(), nombre_responsable=row["responsible_name"]) for row in rows]
+
+    def scheduled_between(self, flows, start: datetime, end: datetime) -> list[CalendarItem]:
+        # Solo programaciones confirmadas (fecha, hora y responsable) del rango visible.
+        rows = self.conn.execute(PICKUPS + """
+            where p.pilot_id = %s and p.flow = any(%s)
+              and p.status in ('programada', 'recolectada') and a.worker_id is not null
+              and s.starts_at >= %s and s.starts_at < %s
+            order by s.starts_at, p.id
+        """, (self.pilot_id, list(flows), start, end)).fetchall()
+        return [_calendar(row) for row in rows]
+
+    def unscheduled(self, flows) -> list[CalendarItem]:
+        rows = self.conn.execute(PICKUPS + """
+            where p.pilot_id = %s and p.flow = any(%s) and p.status in ('recibida', 'revision')
+            order by p.created_at, p.id limit 200
+        """, (self.pilot_id, list(flows))).fetchall()
+        return [_calendar(row) for row in rows]
 
     def notices(self, flow: Flow) -> list[Notice]:
         rows = self.conn.execute("""
@@ -245,7 +370,8 @@ class CollectionTransaction:
     def client_notices(self, client: UUID) -> list[Notice]:
         rows = self.conn.execute("""
             select kind, snapshot, reason from collection_events
-            where pilot_id = %s and client_id = %s order by created_at desc, id desc
+            where pilot_id = %s and client_id = %s and kind <> 'aviso_recolector'
+            order by created_at desc, id desc
         """, (self.pilot_id, client)).fetchall()
         return [_notice(row) for row in rows]
 
@@ -259,8 +385,12 @@ class CollectionTransaction:
             select null, a.to_status, a.detail, null, a.actor_id, a.created_at
             from request_audit a join pickup_requests p on p.id = a.request_id
             where p.pilot_id = %s and p.flow = %s and p.id = %s
+            union all
+            select null, 'puntos_acreditados', jsonb_build_object('puntos', m.amount), null, null, m.created_at
+            from point_movements m join deliveries d on d.id = m.delivery_id
+            where d.pilot_id = %s and d.flow = %s and (d.request_id = %s or d.id = %s)
             order by fecha, id
-        """, (self.pilot_id, flow, id, id, self.pilot_id, flow, id)).fetchall()
+        """, (self.pilot_id, flow, id, id, self.pilot_id, flow, id, self.pilot_id, flow, id, id)).fetchall()
 
     def summary(self, flow: Flow, start: datetime, end: datetime) -> dict:
         rows = self.conn.execute("""
@@ -306,9 +436,12 @@ class CollectionTransaction:
             return {"id": confirmed["id"], "codigo": code, "puntos": confirmed["points_cost"]}
         if issued["expires_at"] <= datetime.now(timezone.utc):
             raise Problem(409, "Código vencido")
+        if issued["reward_validated_at"] is None:
+            raise Problem(409, "El código no corresponde a una recompensa validada")
         try:
             id_, points = confirm_redemption_in_transaction(
                 self.conn, issued["client_id"], issued["reward_id"], code,
+                validated_at=issued["reward_validated_at"],
             )
         except DomainError as exc:
             raise Problem(409, str(exc)) from exc

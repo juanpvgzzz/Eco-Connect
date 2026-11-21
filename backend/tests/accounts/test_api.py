@@ -54,6 +54,15 @@ def test_registration_rejects_invalid_pin():
     assert response.status_code == 422
 
 
+def test_validation_errors_do_not_echo_submitted_credentials():
+    client, _ = make_client()
+    invalid = register(client, pin="x" * 16)
+    incomplete = client.post("/accounts", json={"pin": "0" * 8})
+    for response in (invalid, incomplete):
+        assert response.status_code == 422
+        assert all(set(error) == {"loc", "msg", "type"} for error in response.json()["detail"])
+
+
 def test_adapter_value_error_does_not_leak_internal_details():
     client, store = make_client()
 
@@ -116,6 +125,11 @@ def test_only_admin_can_authorize_profiles_and_enable_pilot():
     assert updated.json()["profile"]["role"] == "leader"
     assert updated.json()["profile"]["pilot_enabled"] is True
     assert updated.json()["collective_id"] == "collective-recyclers"
+    assert {"address", "phone"}.isdisjoint(updated.json()["profile"])
+    users = client.get("/accounts/admin/users", headers={"Authorization": f"Bearer {token}"})
+    assert users.status_code == 200
+    assert users.json()
+    assert all({"address", "phone"}.isdisjoint(user) for user in users.json())
 
 
 def test_openapi_exposes_account_content_and_community_routes():
@@ -126,3 +140,23 @@ def test_openapi_exposes_account_content_and_community_routes():
     assert "/accounts/login" in schema["paths"]
     assert "/content" in schema["paths"]
     assert "/community/collections" in schema["paths"]
+
+
+def test_resident_cannot_manage_access_and_admin_cannot_grant_field_worker_access():
+    client, store = make_client()
+    account = register(client).json()
+    login_body = {"national_id": "123456789", "pin": "1234"}
+    token = client.post("/accounts/login", json=login_body).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    path = f"/accounts/admin/{account['id']}/authorization"
+    worker = {"role": "field_worker", "pilot_enabled": False, "collective_id": "huerta"}
+    assert client.get("/accounts/admin/users", headers=headers).status_code == 403
+    assert client.get("/accounts/admin/collectives", headers=headers).status_code == 403
+    assert client.put(path, headers=headers, json=worker).status_code == 403
+    record = store.find_by_id(account["id"])
+    record.role = AccountRole.ADMIN
+    assert client.put(path, headers=headers, json=worker).status_code == 422
+
+    record.role = AccountRole.FIELD_WORKER
+    assert client.get("/accounts/me", headers=headers).status_code == 401
+    assert client.post("/accounts/login", json=login_body).status_code == 401

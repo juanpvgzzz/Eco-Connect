@@ -58,6 +58,24 @@ class CollectionResponse(BaseModel):
     description: str
     address: str
     created_at: datetime
+    flow: WasteFlow | None = None
+    material: str | None = None
+    availability: str | None = None
+    notes: str | None = None
+
+
+class CollectionEventResponse(BaseModel):
+    """Evento del historial visible para el vecino (sin datos de otras personas)."""
+    event: str
+    at: datetime
+    scheduled_at: datetime | None = None
+    responsible_name: str | None = None
+    result: str | None = None
+    material: str | None = None
+    kilos: str | None = None
+    collected_at: datetime | None = None
+    points: int | None = None
+    reason: str | None = None
 
 
 class NotificationResponse(BaseModel):
@@ -67,6 +85,7 @@ class NotificationResponse(BaseModel):
     title: str
     message: str
     created_at: datetime
+    scheduled_at: datetime | None = None
 
 
 class PointsResponse(BaseModel):
@@ -82,6 +101,21 @@ class PointsMovementResponse(BaseModel):
     created_at: datetime
 
 
+class ParticipationMilestoneResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    pickups: int
+    title: str
+    unlocked_at: datetime | None
+
+
+class ParticipationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    completed: int
+    milestones: list[ParticipationMilestoneResponse]
+
+
 class RewardResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -89,6 +123,23 @@ class RewardResponse(BaseModel):
     title: str
     description: str
     cost: int = Field(ge=0)
+    stock: int = Field(default=0, ge=0)
+
+
+class AdminRewardResponse(RewardResponse):
+    active: bool
+    validated: bool
+
+
+class RewardWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=1000)
+    cost: int = Field(gt=0, le=2**53 - 1, strict=True)
+    stock: int | None = Field(default=None, ge=0, le=2**31 - 1, strict=True)
+    active: bool = Field(default=False, strict=True)
+    validated: bool = Field(default=False, strict=True)
 
 
 class RedemptionRequest(BaseModel):

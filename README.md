@@ -6,13 +6,21 @@ API FastAPI para cuentas, guía ambiental, recolecciones, agenda, avisos, puntos
 
 1. Copia `.env.example` a `.env`. Define `POSTGRES_PASSWORD` para desarrollo local, `DATABASE_URL` con el host `db` y las credenciales del servicio, y `ECO_PILOT_ID` con el UUID del piloto. Para cargar la demo usa `10000000-0000-4000-8000-000000000001` como ID del piloto.
 2. Ejecuta `docker compose up --build -d`. La API aplica las migraciones al arrancar.
-3. En una base nueva de desarrollo, carga los datos ficticios con `docker compose exec -T db psql -v ON_ERROR_STOP=1 -U ecoconecta -d ecoconecta < db/demo.sql`.
-4. Crea el administrador con `docker compose exec api python -m db.provision_admin DOCUMENTO "Nombre"`. El comando solicita el PIN de forma interactiva.
+3. Prepara el piloto local con `docker compose exec api python -m db.initialize_collectives --local-only --create-pilot`. Esto agrega el piloto y los colectivos que falten. La carga de `db/demo.sql` es una alternativa para una base de pruebas vacía.
+4. Crea el primer administrador con `docker compose exec api python -m db.provision_admin --local-only DOCUMENTO "Nombre"`. El comando solicita el PIN de forma interactiva. Si su cuenta ya existe, usa `docker compose exec -e ECO_ALLOW_ADMIN_BOOTSTRAP=true api python -m db.promote_admin --local-only --national-id DOCUMENTO`.
 5. Abre la [documentación OpenAPI local](http://localhost:8000/docs).
 
-Para probar el flujo de liderazgo, registra una cuenta desde la API y usa el administrador para asignarle el rol `leader` y el ID de su colectivo. Consulta los IDs con `docker compose exec db psql -U ecoconecta -d ecoconecta -c 'select id, flow from collectives'`. Los turnos ficticios de la demo se crean al cargarla y cubren la fecha actual y los 30 días siguientes. Organiza los turnos reales en `collection_shifts` y registra los materiales y reglas de puntos antes de cerrar entregas.
+Para habilitar una coordinadora, regístrala desde la página local. Entra como administrador, búscala en **Usuarios y roles**, elige **Coordinación** y su colectivo, y guarda. Al iniciar sesión verá la bandeja de huerta o reciclaje. Los recolectores se mantienen como integrantes operativos registrados en PostgreSQL.
 
 Para conectar el frontend, la especificación está en `/openapi.json`. Las rutas privadas usan `Authorization: Bearer <token>`. Los formularios de alta de recolección reutilizan la misma cabecera `Idempotency-Key` al reintentar un envío. Consulta [los contratos de integración](docs/contratos-modulos.md) para los campos y traducciones.
+
+## Preparar la demostración local (solo desarrollo)
+
+`sh scripts/prepare_demo.sh` verifica Docker, PostgreSQL, la API y los siete perfiles del piloto local. Crea solo los que faltan, sin duplicar ni borrar datos. Se niega a ejecutarse contra bases que no sean locales. Usa `--check` para verificar sin crear.
+
+Las cuentas 10001 (vecino), 20001 (coordinación de huerteros) y 30001 (coordinación de recicladores) usan el PIN documentado `1234`. Los PIN que se generen para las demás cuentas se muestran una sola vez en la terminal interactiva y no se guardan.
+
+Para asignar un PIN temporal a otra cuenta de demostración, ejecuta `docker compose exec api python -m db.prepare_demo --local-only --set-pin CEDULA`.
 
 ## Ejecutar con PostgreSQL local
 

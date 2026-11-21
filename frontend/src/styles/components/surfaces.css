@@ -1,0 +1,110 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  min-width: 0;
+}
+@media (min-width: 768px) {
+  .card {
+    padding: var(--space-5);
+  }
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* Lista de definición compacta (resúmenes y detalles) */
+.summary {
+  display: grid;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.summary-row {
+  display: grid;
+  gap: 0.125rem 1rem;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.summary-row:first-child {
+  border-top: 0;
+}
+@media (min-width: 560px) {
+  .summary-row {
+    grid-template-columns: 9.5rem 1fr auto;
+    align-items: start;
+  }
+}
+.summary-row dt {
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.summary-row dd {
+  margin: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.summary-row .btn {
+  justify-self: start;
+  min-height: var(--touch);
+  padding: 0.25rem 0.5rem;
+  font-size: var(--fs-small);
+}
+
+/* Ventana de confirmación (dialog nativo) */
+.dialog {
+  width: min(30rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.dialog[open] {
+  animation: eco-rise var(--t-slow) var(--ease) both;
+}
+.dialog::backdrop {
+  background: rgb(6 59 46 / 0.45);
+  animation: eco-fade var(--t) var(--ease) both;
+}
+.dialog-body {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+.dialog-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--eco-green-50);
+  color: var(--eco-forest);
+}
+.dialog[data-tone="danger"] .dialog-icon {
+  background: var(--eco-danger-50);
+  color: var(--eco-danger);
+}

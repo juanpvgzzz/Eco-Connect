@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import re
 import secrets
+import unicodedata
 from uuid import uuid4
 
 from pwdlib import PasswordHash
@@ -10,6 +11,7 @@ from pwdlib.exceptions import UnknownHashError
 
 from backend.app.errors import InvalidInput
 from backend.app.accounts.models import (
+    AdminAccountSummary,
     AccountIdentity,
     AccountKind,
     AccountRecord,
@@ -78,12 +80,16 @@ class AccountService:
         normalized_id = normalize_national_id(national_id)
         validate_pin(pin)
         cleaned = {
-            "full_name": full_name.strip(),
-            "address": address.strip(),
+            "full_name": collapse_spaces(full_name),
+            "address": collapse_spaces(address),
             "phone": phone.strip(),
         }
         if not all(cleaned.values()):
             raise InvalidInput("name, address, and phone are required")
+        validate_full_name(cleaned["full_name"])
+        if not 5 <= len(cleaned["address"]) <= 240:
+            raise InvalidInput("address must contain between 5 and 240 characters")
+        cleaned["phone"] = normalize_colombian_phone(cleaned["phone"])
         role = AccountRole.BUSINESS if kind is AccountKind.BUSINESS else AccountRole.RESIDENT
         account = AccountRecord(
             id=str(uuid4()),
@@ -110,7 +116,8 @@ class AccountService:
 
         account = self.store.find_by_national_id(normalized_id)
         valid_pin = self._verify_pin(pin, account.pin_hash if account else self._dummy_hash)
-        if account is None or not valid_pin:
+        unlinked_worker = account is not None and account.role is AccountRole.FIELD_WORKER and not account.worker_id
+        if account is None or unlinked_worker or not valid_pin:
             self.store.record_login_failure(
                 attempt_key,
                 now,
@@ -142,7 +149,7 @@ class AccountService:
         ):
             raise InvalidSession
         account = self.store.find_by_id(session.account_id)
-        if account is None:
+        if account is None or (account.role is AccountRole.FIELD_WORKER and not account.worker_id):
             raise InvalidSession
         return account.identity()
 
@@ -160,9 +167,13 @@ class AccountService:
         role: AccountRole,
         pilot_enabled: bool,
         collective_id: str | None,
+        worker_id: str | None = None,
     ) -> AccountIdentity:
         if actor.profile.role is not AccountRole.ADMIN:
             raise ForbiddenAction
+        if role is AccountRole.FIELD_WORKER and (not collective_id or not worker_id):
+            # El acceso operativo se vincula a un integrante ya registrado del colectivo.
+            raise InvalidInput("field workers must be linked to a registered collective member")
         current = self.store.find_by_id(account_id)
         if current is None:
             raise AccountNotFound
@@ -170,14 +181,64 @@ class AccountService:
             role is AccountRole.BUSINESS and current.kind is not AccountKind.BUSINESS
         ) or (role is AccountRole.RESIDENT and current.kind is not AccountKind.HOUSEHOLD):
             raise InvalidInput("account role must match its registered kind")
-        if pilot_enabled and current.kind is not AccountKind.BUSINESS:
-            raise InvalidInput("only businesses can be enabled for the pilot")
+        # RN-08: hogares y unidades productivas se habilitan como usuarios piloto por cuenta.
         collective_id = collective_id.strip() if collective_id else None
         if role is AccountRole.LEADER and collective_id is None:
             raise InvalidInput("leader profiles must be assigned to a collective")
         account = self.store.set_authorization(
-            account_id, role, pilot_enabled, collective_id
+            account_id, role, pilot_enabled, collective_id, actor_id=actor.id,
+            worker_id=worker_id if role is AccountRole.FIELD_WORKER else None,
         )
+        if account is None:
+            raise AccountNotFound
+        return account.identity()
+
+    def admin_accounts(
+        self, *, actor: AccountIdentity, search: str | None = None,
+        role: AccountRole | None = None, limit: int = 50, offset: int = 0,
+    ) -> list[AdminAccountSummary]:
+        if actor.profile.role is not AccountRole.ADMIN:
+            raise ForbiddenAction
+        return self.store.list_accounts(search=search, role=role, limit=limit, offset=offset)
+
+    def admin_collectives(self, *, actor: AccountIdentity) -> list[dict[str, str]]:
+        if actor.profile.role is not AccountRole.ADMIN:
+            raise ForbiddenAction
+        return self.store.list_collectives()
+
+    def admin_create_point_rule(self, *, actor: AccountIdentity, material_code: str, material_name: str,
+                                points_per_kg, note: str | None = None):
+        """Valor provisional configurado por administración (no es equivalencia oficial)."""
+        if actor.profile.role is not AccountRole.ADMIN:
+            raise ForbiddenAction
+        return self.store.create_point_rule(material_code, material_name, points_per_kg, note, actor.id)
+
+    def admin_collective_members(self, *, actor: AccountIdentity, collective_id: str) -> list[dict]:
+        if actor.profile.role is not AccountRole.ADMIN:
+            raise ForbiddenAction
+        members = self.store.list_collective_members(collective_id)
+        if members is None:
+            raise AccountNotFound
+        return members
+
+    def admin_point_rules(self, *, actor: AccountIdentity):
+        if actor.profile.role is not AccountRole.ADMIN:
+            raise ForbiddenAction
+        return self.store.list_point_rules()
+
+    def admin_collection_report(self, *, actor: AccountIdentity, start: datetime, end: datetime):
+        if actor.profile.role is not AccountRole.ADMIN:
+            raise ForbiddenAction
+        if start.tzinfo is None or end.tzinfo is None or start >= end:
+            raise InvalidInput("A valid timezone-aware interval is required")
+        return self.store.collection_report(start, end)
+
+    def set_account_active(
+        self, *, actor: AccountIdentity, account_id: str, active: bool,
+    ) -> AccountIdentity:
+        if actor.profile.role is not AccountRole.ADMIN:
+            raise ForbiddenAction
+        account = self.store.set_account_active(account_id, active, actor_id=actor.id)
         if account is None:
             raise AccountNotFound
         return account.identity()
@@ -204,6 +265,35 @@ def normalize_national_id(value: str) -> str:
     if not normalized or not re.fullmatch(r"[0-9]{1,20}", normalized):
         raise InvalidInput("national id must contain only digits and common separators")
     return normalized
+
+
+def collapse_spaces(value: str) -> str:
+    return " ".join(value.split())
+
+
+def validate_full_name(value: str) -> None:
+    allowed_punctuation = {" ", "'", "’", ".", "-"}
+    if (len(value) > 160 or sum(char.isalpha() for char in value) < 2
+            or any(not (char.isalpha() or unicodedata.category(char) == "Mn"
+                        or char in allowed_punctuation) for char in value)):
+        raise InvalidInput("full name contains invalid characters")
+
+
+def normalize_colombian_phone(value: str) -> str:
+    """Celular (3xx) o fijo (60x) colombiano de 10 dígitos; acepta +57 y separadores.
+
+    Solo se aplica a registros nuevos: las cuentas existentes no se revalidan.
+    """
+    digits = re.sub(r"[\s().\-]", "", value)
+    if digits.startswith("+57"):
+        digits = digits[3:]
+    elif digits.startswith("0057"):
+        digits = digits[4:]
+    elif len(digits) == 12 and digits.startswith("57"):
+        digits = digits[2:]
+    if not re.fullmatch(r"(3[0-9]|60)[0-9]{8}", digits):
+        raise InvalidInput("phone must be a 10-digit Colombian number")
+    return digits
 
 
 def validate_pin(pin: str) -> None:

@@ -17,6 +17,7 @@ const accounts = samples.map(
   ([national_id, full_name, role, collective_id], i) => ({
     id: "20000000-0000-4000-8000-00000000000" + (i + 1),
     collective_id,
+    collective_flow: collective_id,
     profile: {
       national_id,
       full_name,
@@ -32,6 +33,11 @@ const workers = {
   huerta: ["30000000-0000-4000-8000-000000000001", "Luis Herrera"],
   reciclaje: ["30000000-0000-4000-8000-000000000002", "Rosa Mora"],
 };
+const materials = [
+  { code: "VEGETAL", name: "Restos vegetales" },
+  { code: "PAPEL", name: "Papel" },
+  { code: "PET", name: "Botellas plásticas" },
+];
 const statuses = {
   recibida: "received",
   programada: "scheduled",
@@ -43,6 +49,10 @@ const titles = {
   reprogramada: "Cambio de cita",
   recolectada: "Recogida completada",
 };
+const milestones = [
+  [1, "Mi primera recogida"], [3, "Vecino comprometido"], [5, "Guardián verde"],
+  [10, "Héroe ambiental"], [20, "Embajador EcoConecta"],
+];
 
 const registrationStore = "eco.demo.registrations.v1";
 async function pinVerifier(pin, salt) {
@@ -69,7 +79,7 @@ async function pinVerifier(pin, salt) {
   ).join("");
 }
 
-async function serve(path, { token, body, key }) {
+async function serve(path, { token, body, key, method }) {
   const registrations = JSON.parse(
     localStorage.getItem(registrationStore) || "[]",
   );
@@ -127,6 +137,13 @@ async function serve(path, { token, body, key }) {
   );
   const own = db.rows.filter((r) => r.cliente === user.id);
   const leader = user.profile.role === "leader";
+  if (leader && !body && (!method || method === "GET")) {
+    if (path === "/recolecciones/recolectores" || path === "/recolecciones/recolectores?todos=true") {
+      const [id, full_name] = workers[user.collective_flow];
+      return [{ id, full_name, active: true }];
+    }
+    if (path === "/recolecciones/materiales") return materials;
+  }
   const inbox = db.rows.filter((r) => leader && r.flujo === user.collective_id);
   const visible = leader ? inbox : own;
   const events = db.events.filter((e) =>
@@ -147,6 +164,19 @@ async function serve(path, { token, body, key }) {
   }
   if (path === "/community/points")
     return { balance: own.reduce((sum, r) => sum + (r.points || 0), 0) };
+  if (path === "/community/points/movements" || path === "/community/points/participation") {
+    const credits = db.events.filter((event) => event.evento === "recolectada").flatMap((event) => {
+      const row = own.find((item) => item.id === event.solicitud_id && item.estado === "recolectada" && item.points > 0);
+      return row ? [{ id: row.id, points: row.points, reason: "Entrega", created_at: event.created_at }] : [];
+    });
+    if (path === "/community/points/movements") return credits;
+    const completed = [...credits].reverse();
+    return {
+      completed: completed.length,
+      milestones: milestones.map(([pickups, title]) => ({ pickups, title, unlocked_at: completed[pickups - 1]?.created_at ?? null })),
+    };
+  }
+  if (path === "/community/rewards") return [];
   if (path === "/community/appointments")
     return own
       .filter((r) => r.estado === "programada")
